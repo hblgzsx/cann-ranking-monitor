@@ -27,4 +27,7 @@ jobs:
         run: |
           git -C .state add latest.json cloud-checkpoint.json
           git -C .state -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Back up Cloudflare ranking history'
+          node scripts/seal-checkpoint.mjs "$(git -C .state rev-parse HEAD)"
+          git -C .state add cloud-checkpoint.json
+          git -C .state -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Seal immutable Cloudflare backup manifest'
           git -C .state push origin HEAD:data

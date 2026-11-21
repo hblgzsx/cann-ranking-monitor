@@ -35,9 +35,9 @@ export async function adoptCheckpoint(env){
  const now=Date.now(),head=await env.DB.prepare('UPDATE monitor_head SET checkpoint_checked_at=? WHERE id=1 AND checkpoint_checked_at<? RETURNING baseline_version,baseline_cursor,seq,poll_count').bind(now,now-3600000).first();
  if(!head)return;
  try{
-  const ref=await getJSON(`https://api.github.com/repos/${REPO}/git/ref/heads/data`,{attempts:1,timeoutMs:5000});
-  const sha=ref.object?.sha;if(!/^[a-f0-9]{40}$/.test(sha))throw Error('Invalid checkpoint commit');
-  const root=`https://raw.githubusercontent.com/${REPO}/${sha}/`,manifest=await getJSON(root+'cloud-checkpoint.json',{attempts:1,timeoutMs:5000});
+  const manifest=await getJSON(`https://raw.githubusercontent.com/${REPO}/data/cloud-checkpoint.json?t=${now}`,{attempts:1,timeoutMs:8000});
+  const sha=manifest.commit;if(!/^[a-f0-9]{40}$/.test(sha))throw Error('Checkpoint has not been sealed with an immutable commit');
+  const root=`https://raw.githubusercontent.com/${REPO}/${sha}/`;
   if(manifest.parentVersion!==head.baseline_version||manifest.cursor<head.baseline_cursor||manifest.cursor>head.seq||manifest.pollCount>head.poll_count||manifest.version===head.baseline_version)return;
   if(!Number.isSafeInteger(manifest.cursor)||!Number.isSafeInteger(manifest.pollCount)||!/^[a-zA-Z0-9-]{1,80}$/.test(manifest.version))throw Error('Invalid checkpoint manifest');
   const file=await fetch(root+'latest.json',{method:'HEAD'});if(!file.ok)throw Error('Checkpoint file is unavailable');
