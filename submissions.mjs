@@ -1,3 +1,4 @@
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime} from './lib/scoring.mjs';
@@ -61,7 +62,7 @@ function renderList(){
  $('#record-updates').textContent=frozen?`列表已冻结${pending?` · 后台新增 ${pending} 条，恢复后显示`:''}`:newKeys.size?`本轮新增 ${newKeys.size} 条记录 · 自动更新中`:'云端采集继续 · 列表自动更新';
  $('#record-updates').classList.toggle('freeze-note',frozen);
 }
-function render(){if(!data)return;records=submissionRecords(data);newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
+function render(){if(!data)return;data=prefixData(data);records=submissionRecords(data);newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
 function renderDetail(key){
  const r=shown.find(r=>r.key===key);if(!r)return;detailKey=key;
  $('#record-detail-title').textContent=r.teamName;
@@ -113,6 +114,7 @@ $('#export-records').addEventListener('click',()=>{
  const rows=filtered.map(r=>[r.teamName,r.submitter,r.status,r.submissionId,r.submittedAt?date(r.submittedAt):'',r.observedAt?date(r.observedAt):'',r.timeBasis,fmt(r.score),r.officialScore===null?'':fmt(r.officialScore),r.officialScoreAt?date(r.officialScoreAt):'',...shownData.tbest.flatMap((T,i)=>[r.times[i],T,pointScore(r.times[i],T)])]);
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+[header,...rows].map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='cann-submissions-'+beijingDay()+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`已导出 ${filtered.length} 条筛选记录`);
 });
+initTeamPrefixes({getData:()=>data,onChange:()=>{if(data){if(frozen&&shownData){shownData=prefixData(shownData);shown=submissionRecords(shownData)}render()}}});
 data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
 try{const config=await fetch('./data-source.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(6000)}).then(r=>r.json());if(/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(config.cloudflareEndpoint)){feed=createFeedClient(config.cloudflareEndpoint,{cache:storage.get('cloud-feed',null),save:state=>storage.set('cloud-feed',state)})}}catch{}
 const urlTeam=new URLSearchParams(location.search).get('team');if(urlTeam){$('#record-team').value=urlTeam;renderStats();renderList()}

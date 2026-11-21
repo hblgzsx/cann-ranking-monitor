@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mergeSnapshot} from '../lib/scoring.mjs';
 import {recoverTbestHistory} from '../lib/tbest-history.mjs';
-import {tbestReport,referenceImpact} from '../lib/tbest-analysis.mjs';
+import {tbestReport,referenceImpact,tbestChangeText} from '../lib/tbest-analysis.mjs';
 import {createFeedClient,makePatch} from '../lib/feed.mjs';
 const at=n=>new Date(1800000000000+n*60000).toISOString();
 const snap=(n,best=[10,20],ids=['s1','s2'])=>({capturedAt:at(n),testcaseIds:['a','b'],tbest:best,tbestSubmissionIds:ids,teams:[{id:'t',name:'Team',officialRank:1,status:'Pass',officialScore:80,submissionId:'s1',submittedAt:at(0),latest:[10,40]}]});
@@ -36,4 +36,8 @@ test('cloud replay upgrades legacy history and immutable backups retain the comp
  const merged=await feed.read();assert.equal(merged.tbestHistoryVersion,1);assert.equal(merged.tbestHistory.length,2);
  const checkpoint=feed.checkpoint(),restored=createFeedClient('https://collector.test',{fetcher:async url=>Response.json(String(url).includes('/api/head')?{...head,baseline_cursor:1,baseline_poll_count:1}:checkpoint)});
  assert.deepEqual((await restored.read()).tbestHistory,merged.tbestHistory);assert.equal(tbestReport(await restored.read()).faster,1);
+});
+test('TBest change descriptions name verified or matched teams without claiming unconfirmed attribution',()=>{
+ const event={index:2,direction:'faster',changePct:-12.34,owner:{method:'official-id',teams:[{name:'甲队'}]}};
+ assert.equal(tbestChangeText(event),'点3 甲队 · 降低 12.34%');assert.match(tbestChangeText({...event,owner:{method:'observed-match',teams:[{name:'乙队'}]}}),/乙队（耗时匹配）/);assert.match(tbestChangeText({...event,owner:{method:'unknown',teams:[]}}),/队伍未确认/);
 });

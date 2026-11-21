@@ -1,3 +1,4 @@
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime,bestHistoricalSubmission,resolveTbestOwners} from './lib/scoring.mjs?v=20261121-history';
@@ -54,6 +55,7 @@ function freshness(){
  $('#notice').textContent=failed?`采集或同步异常：${collector.lastError}${retry}。保留最后有效数据；后台目标间隔 ${interval} 秒。`:stale?`数据已 ${age<120?age+' 秒':Math.floor(age/60)+' 分钟'}未更新，请查看采集状态。当前显示最后一次成功快照。`:`历史记录始于 ${date(data.startedAt)}（北京时间）· ${collector?.provider==='cloudflare'?'Cloudflare 云端':'后台'}目标每 ${interval} 秒采集。仅记录采集到的提交，采样间隔中的提交仍可能遗漏。`;
 }
 function render(){
+ data=prefixData(data);
  const r=ranked(),owners=ownerLabels();
  $('#stat-teams').textContent=r.length;$('#stat-pass').textContent=`${r.filter(t=>/^pass$/i.test(t.status)).length} 支队伍当前通过`;
  $('#stat-best').textContent=fmt(r[0]?.computed);$('#stat-leader').textContent=r[0]?.name??'等待数据';$('#stat-points').textContent=data.tbest.length;
@@ -153,6 +155,7 @@ $('#export').addEventListener('click',()=>{
  const rows=filtered().map(t=>{const times=viewTimes(t),s=t.bestSubmission;return [view==='official'?t.officialRank:t.displayRank,t.name,t.submitter,t.status,fmt(t.computed),fmt(s?.score??0),fmt(t.officialScore),s?.submissionId??'',s?.submittedAt?date(s.submittedAt):'',s?.observedAt?date(s.observedAt):'',...best.flatMap((T,i)=>[times[i],T,pointScore(times[i],T),owners[i].label,owners[i].method]),date(t.submittedAt)]});
  const blob=new Blob(['\uFEFF'+[headers,...rows].map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`cann-${view}-${new Date(data.capturedAt).toISOString().replace(/[:.]/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出当前筛选结果及逐点基准分')
 });
+initTeamPrefixes({getData:()=>data,onChange:()=>{if(data)render()}});
 data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
 try{const config=await fetch('./data-source.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(6000)}).then(r=>r.json());if(config.cloudflareEndpoint&&/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(config.cloudflareEndpoint)){cloudEndpoint=config.cloudflareEndpoint;cloudFeed=createFeedClient(cloudEndpoint,{cache:storage.get('cloud-feed',null),save:state=>storage.set('cloud-feed',state)})}}catch{}
 await refresh();const match=location.hash.match(/^#team=(.+)$/);if(match&&data)showTeam(decodeURIComponent(match[1]));nextCheckAt=Date.now()+15000;pollStatus();setInterval(()=>{freshness();nextCheckAt=Date.now()+15000;if(!document.hidden)refresh();pollStatus()},15000);setInterval(pollStatus,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextCheckAt=Date.now()+15000;refresh()}pollStatus()});
