@@ -14,7 +14,7 @@
 - 状态配色适配深浅主题：Pass 绿、Wrong Answer 红、Runtime Error 紫、Compile Error 橙、Time Limit Exceeded 琥珀、Memory Limit Exceeded 青、Output Limit Exceeded 粉、排队/评测中蓝，并始终保留状态文字。
 - 点击“置顶队伍”可多选队伍，在同一张表的第 1 名前追加置顶行；完整榜单仍保留原记录和真实名次。置顶在三个榜单间共用，在当前浏览器持久保存，独立于搜索及仅关注筛选；CSV 只导出正常筛选结果，不重复置顶行。
 - 历史由独立 `data` 分支持久化，所有访问者共享；网页每 15 秒检查数据。
-- GitHub Actions 每半小时启动约 28 分钟采集循环，目标每分钟一次；调度可能延迟，页面显示准确采集时间与过期提示。
+- GitHub Actions 每 5 分钟启动一轮约 4 分钟的采集循环，循环内目标每分钟一次；短轮次用于减少长任务结束后的空档。GitHub 调度、Runner 启动和源站响应仍可能造成延迟，页面显示准确采集时间与过期提示。
 
 ## 计分
 
@@ -41,8 +41,8 @@ npm run serve
 - `main`：站点源码，推送触发 `Deploy GitHub Pages`，只发布静态资源和最后一次有效快照，不发布脚本、临时文件或凭据。
 - `data`：采集持久状态，根目录 `latest.json`。首次创建时从 main 建立分支并写入初始快照。
 - 仓库 Settings → Pages 的 Build and deployment 使用 **GitHub Actions**。
-- `Collect public ranking` 定时启动，也可以手动运行；duration=0 只采一次，默认 28 分钟。
-- 定时任务使用 UTC `7,37 * * * *`；公开仓库标准 Linux runner。2026-12-05 12:45（北京时间，比赛结束后 1 小时）起定时采集自动跳过，手动采集仍可执行。也可以在 Actions 禁用此工作流。
+- `Collect public ranking` 每 5 分钟定时启动，也可以手动运行；duration=0 只采一次，默认 4 分钟。每轮内约每分钟写入一个快照。
+- 定时任务使用 UTC `*/5 * * * *`；公开仓库标准 Linux runner。2026-12-05 12:45（北京时间，比赛结束后 1 小时）起定时采集自动跳过，手动采集仍可执行。也可以在 Actions 禁用此工作流。
 - 采集只匿名 GET 官方公开接口，不需要任何账号、Cookie 或 Secret。GITHUB_TOKEN 仅由 Actions 用于本仓库 data 分支写入。
 - 数据异常、隐藏/封榜、分页变化或网络失败时保留最后有效快照，页面会显示过期。Actions 的定时任务不是严格实时服务，允许排队、丢失中间提交和短暂停顿。
 - “读取最新快照”只立即检查后台已采集的数据，不会触发源站采集；没有更晚快照时明确提示“暂无更新的快照”。
