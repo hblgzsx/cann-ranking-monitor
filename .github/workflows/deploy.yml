@@ -22,8 +22,8 @@ jobs:
       - name: Assemble static site
         run: |
           mkdir -p _site/lib _site/data
-          cp index.html submissions.html team.html style.css submissions.css team-analysis.css app.mjs submissions.mjs team.mjs favicon.svg data-source.json _site/
-          cp lib/scoring.mjs lib/analytics.mjs lib/analysis-ui.mjs lib/feed.mjs lib/submissions.mjs lib/team-report.mjs lib/live-data.mjs lib/icons.mjs lib/team-analysis-ui.mjs _site/lib/
+          cp tbest.html tbest.css tbest.mjs index.html submissions.html team.html style.css submissions.css team-analysis.css app.mjs submissions.mjs team.mjs favicon.svg data-source.json _site/
+          cp lib/scoring.mjs lib/analytics.mjs lib/analysis-ui.mjs lib/feed.mjs lib/submissions.mjs lib/team-report.mjs lib/live-data.mjs lib/icons.mjs lib/team-analysis-ui.mjs lib/tbest-history.mjs lib/tbest-analysis.mjs _site/lib/
           cp data/latest.json _site/data/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
