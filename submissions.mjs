@@ -2,7 +2,7 @@ import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime} from './lib/scoring.mjs';
 import {createFeedClient} from './lib/feed.mjs';
-import {submissionRecords,filterSubmissions,beijingInputTime,beijingDay,dayStatistics,statusGroup} from './lib/submissions.mjs';
+import {submissionRecords,filterSubmissions,beijingInputTime,beijingDay,dayStatistics,hourStatistics,statusGroup} from './lib/submissions.mjs';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—';
 const date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t)):'未记录';
@@ -13,7 +13,7 @@ let data=null,records=[],shownData=null,shown=[],filtered=[],page=1,pageSize=50,
 let today=beijingDay(),followToday=true,refreshFailed=false,lastCheck=0;
 $('#stats-day').value=today;
 function toast(text){clearTimeout(toastTimer);$('#toast').textContent=text;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2600)}
-function clock(){const now=new Date();$('#screen-clock').textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now);const day=beijingDay();if(day!==today){today=day;if(followToday){$('#stats-day').value=day;selectedHour=null;page=1;renderStats();renderList()}}if(data)freshness()}
+function clock(){const now=new Date();$('#screen-clock').textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now);const day=beijingDay();if(day!==today){today=day;if(followToday){$('#stats-day').value=day;if(selectedHour!==null){$('#record-from').value='';$('#record-to').value=''}selectedHour=null;page=1;renderStats();renderList()}}if(data)freshness()}
 function freshness(){
  const age=Math.max(0,Math.floor((Date.now()-Date.parse(data.capturedAt))/1000));
  $('#updated').textContent=`快照 ${date(data.capturedAt)} · ${age<60?age+' 秒':Math.floor(age/60)+' 分钟'}前 · ${busy?'更新中':document.hidden?'后台显示暂停':`每 ${data.expectedIntervalSeconds??15} 秒检查`}`;
@@ -24,14 +24,20 @@ function freshness(){
 function renderStats(){
  if(!data)return;const day=$('#stats-day').value;if(!day)return;
  const stats=dayStatistics(records,data.teams,day),isToday=day===today;
- const cards=[{label:(isToday?'今日':'当日')+'已采集提交',value:stats.total,color:'blue',note:'按提交 ID 去重 · 实际提交日期'},{label:'活跃队伍',value:stats.activeTeams,note:`共 ${data.teams.length} 支已观察队伍`},{label:'已知结果通过率',value:stats.passRate===null?'—':stats.passRate.toFixed(1)+'%',color:'green',note:`Pass ${stats.groups.pass} / 未通过 ${stats.groups.failed}`},{label:'评测中 / 状态未记录',value:`${stats.groups.pending} / ${stats.groups.unknown}`,note:'未记录状态不计入通过率分母'},{label:isToday?'近 15 分钟提交':'最后一次提交',value:isToday?stats.recent:stats.latest?date(stats.latest).split(' ').at(-1):'—',note:`另有 ${stats.legacy} 条旧快照未计入次数`}];
+ const cards=[{label:(isToday?'今日':'当日')+'已采集提交',value:stats.total,color:'blue',note:'按提交 ID 去重 · 实际提交日期'},{label:'活跃队伍',value:stats.activeTeams,note:`共 ${data.teams.length} 支已观察队伍`},{label:'已知结果通过率',value:stats.passRate===null?'—':stats.passRate.toFixed(1)+'%',color:'green',note:`Pass ${stats.groups.pass} / 未通过 ${stats.groups.failed}`},{label:'累计已采集提交',value:records.filter(r=>r.submissionId).length,note:'全部日期 · 按提交 ID 去重 · 不含无 ID 旧快照'},{label:isToday?'近 15 分钟提交':'最后一次提交',value:isToday?stats.recent:stats.latest?date(stats.latest).split(' ').at(-1):'—',note:`另有 ${stats.legacy} 条旧快照未计入次数`}];
  $('#day-metrics').innerHTML=cards.map(c=>`<article><div class="metric-label">${c.label}</div><strong class="${c.color??''}">${esc(c.value)}</strong><small>${esc(c.note)}</small></article>`).join('');
  const max=Math.max(1,...stats.hours),peak=stats.hours.indexOf(max);
  $('#hour-summary').textContent=stats.total?`峰值 ${String(peak).padStart(2,'0')}:00 · ${max} 次`:'所选日期暂无可确认的提交';
  $('#hour-chart').innerHTML=stats.hours.map((count,h)=>`<button class="hour-column" type="button" data-hour="${h}" data-active="${selectedHour===h}" aria-label="${h}时，${count}次提交，点击筛选" aria-pressed="${selectedHour===h}" style="--height:${count?Math.max(3,count/max*85):1}%"><span class="hour-fill"></span>${count?`<span class="hour-number">${count}</span>`:''}</button>`).join('');
- $('#active-team-count').textContent=`${stats.activeTeams} 队活跃`;
- const teams=stats.teams.filter(t=>showZero||t.count),teamMax=Math.max(1,...teams.map(t=>t.count));
- $('#team-counts').innerHTML=teams.map(t=>`<button class="team-count-row ${$('#record-team').value===t.id?'selected':''}" data-count-team="${esc(t.id)}" title="查看 ${esc(t.name)} 的 ${t.count} 次提交"><span>${esc(t.name)}${t.archived?' · 已离榜':''}</span><span class="team-count-track"><i style="width:${t.count/teamMax*100}%"></i></span><strong>${t.count}</strong></button>`).join('')||'<div class="record-empty">所选日期暂无可确认的提交。<br>可开启“显示零提交队伍”或切换日期。</div>';
+ const teamStats=selectedHour===null?stats:hourStatistics(records,data.teams,day,selectedHour);
+ $('#team-count-title').textContent=selectedHour===null?'队伍提交次数':`${String(selectedHour).padStart(2,'0')}:00–${String(selectedHour).padStart(2,'0')}:59 队伍次数`;
+ $('#active-team-count').textContent=`${teamStats.activeTeams} 队 · ${teamStats.total} 次`;
+ $('#team-counts').setAttribute('aria-label',selectedHour===null?'各队当日提交次数':'各队所选小时提交次数');
+ $('#hour-detail').hidden=selectedHour===null;$('#export-hour-teams').hidden=selectedHour===null;
+ if(selectedHour!==null){$('#hour-detail-title').textContent=`${day} ${String(selectedHour).padStart(2,'0')}:00–${String(selectedHour).padStart(2,'0')}:59`;$('#hour-detail-summary').textContent=`${teamStats.total} 次已采集提交 · ${teamStats.activeTeams} 支队伍`}
+ $('#team-count-note').textContent=selectedHour===null?'按当日次数排序，点击队伍筛选下方记录；同一提交 ID 计一次。':'以下为选定小时各队提交次数，点击队伍查看具体记录。';
+ const teams=teamStats.teams.filter(t=>showZero||t.count),teamMax=Math.max(1,...teams.map(t=>t.count));
+ $('#team-counts').innerHTML=teams.map(t=>`<button class="team-count-row ${$('#record-team').value===t.id?'selected':''}" data-count-team="${esc(t.id)}" title="查看 ${esc(t.name)} 的 ${t.count} 次提交"><span>${esc(t.name)}${t.archived?' · 已离榜':''}</span><span class="team-count-track"><i style="width:${t.count/teamMax*100}%"></i></span><strong>${t.count}</strong></button>`).join('')||'<div class="record-empty">所选时段暂无可确认的提交。<br>可开启“显示零提交队伍”或切换日期。</div>';
 }
 function updateTeamOptions(){const sig=data.teams.map(t=>t.id+t.name).join('|');if(sig===optionsSignature)return;optionsSignature=sig;const selected=$('#record-team').value;$('#record-team').innerHTML='<option value="">全部队伍</option>'+[...data.teams].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN')).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}${t.archived?'（已离榜）':''}</option>`).join('');$('#record-team').value=selected}
 function filterOptions(){
@@ -42,7 +48,7 @@ function filterOptions(){
 function renderList(){
  if(!shownData)return;
  const options=filterOptions(),invalid=Number.isNaN(options.from)||Number.isNaN(options.to)||options.from!==null&&options.to!==null&&options.from>options.to;
- filtered=invalid?[]:filterSubmissions(shown,options);
+ filtered=invalid?[]:filterSubmissions(selectedHour===null?shown:shown.filter(r=>r.submissionId&&r.timeBasis==='submitted'),options);
  const pages=Math.max(1,Math.ceil(filtered.length/pageSize));page=Math.max(1,Math.min(page,pages));
  const offset=(page-1)*pageSize,slice=filtered.slice(offset,offset+pageSize);
  $('#record-total').textContent=`${shown.filter(r=>r.submissionId).length} 份有 ID 的提交 · ${shown.filter(r=>!r.submissionId).length} 条无 ID 旧快照`;
@@ -85,6 +91,13 @@ $('#team-counts').addEventListener('click',e=>{const button=e.target.closest('[d
 $('#hour-chart').addEventListener('click',e=>{const button=e.target.closest('[data-hour]');if(!button)return;const h=Number(button.dataset.hour);selectedHour=selectedHour===h?null:h;$('#only-day').checked=true;const day=$('#stats-day').value;$('#record-from').value=selectedHour===null?'':`${day}T${String(h).padStart(2,'0')}:00`;$('#record-to').value=selectedHour===null?'':`${day}T${String(h).padStart(2,'0')}:59`;page=1;renderStats();renderList()});
 $('.quick-ranges').addEventListener('click',e=>{const button=e.target.closest('[data-range]');if(!button)return;const n=Number(button.dataset.range),now=Date.now(),input=timestamp=>new Date(timestamp+8*3600000).toISOString().slice(0,16);$('#record-from').value=input(now-n*60000);$('#record-to').value=input(now);$('#only-day').checked=false;selectedHour=null;page=1;renderStats();renderList()});
 $('#clear-records').addEventListener('click',clearFilters);
+$('#clear-hour').addEventListener('click',()=>{selectedHour=null;$('#record-from').value='';$('#record-to').value='';page=1;renderStats();renderList()});
+$('#export-hour-teams').addEventListener('click',()=>{
+ if(!data||selectedHour===null)return;
+ const day=$('#stats-day').value,stats=hourStatistics(records,data.teams,day,selectedHour);
+ const rows=[['统计日期(北京时间)','小时','队伍','提交次数'],...stats.teams.filter(t=>t.count).map(t=>[day,String(selectedHour).padStart(2,'0')+':00–'+String(selectedHour).padStart(2,'0')+':59',t.name,t.count])];
+ const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`cann-hour-teams-${day}-${String(selectedHour).padStart(2,'0')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`已导出 ${stats.activeTeams} 支队伍的小时统计`);
+});
 $('#freeze').addEventListener('click',()=>{if(!data)return;frozen=!frozen;freezeKeys=new Set(records.map(r=>r.key));$('#freeze').setAttribute('aria-pressed',frozen);$('#freeze').textContent=frozen?'▷ 恢复列表更新':'Ⅱ 冻结列表';if(!frozen){shownData=data;shown=records}renderList()});
 $('#page-size').addEventListener('change',e=>{pageSize=Number(e.target.value);page=1;renderList()});
 $('#prev-page').addEventListener('click',()=>{page--;renderList()});$('#next-page').addEventListener('click',()=>{page++;renderList()});
