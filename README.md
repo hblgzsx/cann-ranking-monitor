@@ -1,0 +1,43 @@
+# CANN Monitor
+
+独立的 BatchedDiagGmmEm 比赛观察站，部署在 **https://hblgzsx.github.io/cann-ranking-monitor/**。不修改账号博客或其他系统，不使用自定义域名或全域 Service Worker。
+
+## 功能
+
+- 官方当前榜单与逐点历史最优重算榜，完整分页采集所有队伍。
+- 队伍详情：计算分 / 官方分 / 名次差异、趋势、逐点历史最好 / 最新 / TBest、得分与差距。
+- 深浅主题（跟随首次系统偏好并记住手动选择）、搜索、关注、表头排序、CSV 导出、暂停刷新、详情分享链接。
+- 历史由独立 `data` 分支持久化，所有访问者共享；网页每 15 秒检查数据。
+- GitHub Actions 每半小时启动约 28 分钟采集循环，目标每分钟一次；调度可能延迟，页面显示准确采集时间与过期提示。
+
+## 计分
+
+`S_i = 100 / (1 + log(t_i / T_i) / log(1.5))`，总分为所有测试点得分的算术平均。
+
+历史榜 `t_i` 取本系统观察到的该队每点有效最小耗时，`T_i` 使用当前官方 TBest。缺失点 0 分；未整体 Pass 的提交不更新历史最优。若官方参考回退，历史耗时优于当前 TBest 的点按 100 分显示并标注参考变化。底层使用 API 原始微秒值计算，页面仅作格式化。
+
+**历史范围**：官方匿名榜单仅提供当前提交；全局历史接口要求登录。本系统不读取账号私有提交数据。历史从首次成功采集开始积累，不能恢复监控启动前的全部提交；跨提交组合的分数不是官方最终成绩。`data` 分支保留原始快照历史提交，单队前端趋势最多保存 2000 个变化点。
+
+## 本地运行
+
+需要 Node.js 22+，无需安装依赖。
+
+```powershell
+npm test
+npm run collect
+npm run serve
+```
+
+打开 `http://127.0.0.1:4173`。`collect` 默认更新 `data/latest.json`；设置 `OUTPUT_FILE` 可指定其他状态文件。
+
+## 部署与采集
+
+- `main`：站点源码，推送触发 `Deploy GitHub Pages`，只发布静态资源和最后一次有效快照，不发布脚本、临时文件或凭据。
+- `data`：采集持久状态，根目录 `latest.json`。首次创建时从 main 建立分支并写入初始快照。
+- 仓库 Settings → Pages 的 Build and deployment 使用 **GitHub Actions**。
+- `Collect public ranking` 定时启动，也可以手动运行；duration=0 只采一次，默认 28 分钟。
+- 定时任务使用 UTC `7,37 * * * *`；公开仓库标准 Linux runner。到期或不再需要监控时，在 Actions 禁用此工作流即可。
+- 采集只匿名 GET 官方公开接口，不需要任何账号、Cookie 或 Secret。GITHUB_TOKEN 仅由 Actions 用于本仓库 data 分支写入。
+- 数据异常、隐藏/封榜、分页变化或网络失败时保留最后有效快照，页面会显示过期。Actions 的定时任务不是严格实时服务，允许排队、丢失中间提交和短暂停顿。
+
+公开来源：https://cannjudge.cn/public/2026_cann_final/batcheddiaggmmem/ranking
