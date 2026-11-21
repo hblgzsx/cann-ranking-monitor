@@ -1,4 +1,4 @@
-import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs';
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {initSubmissionAnalysis} from './lib/team-analysis-ui.mjs';
 import {installIcons} from './lib/icons.mjs';
 import {buildTeamReport} from './lib/team-report.mjs';

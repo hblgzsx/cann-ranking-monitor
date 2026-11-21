@@ -1,4 +1,4 @@
-import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs';
+import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime} from './lib/scoring.mjs';
@@ -22,15 +22,16 @@ function freshness(){
  $('#screen-notice').classList.toggle('warning',!!problem);
  $('#screen-notice').textContent=problem?`${refreshFailed?'数据同步失败，正在重试。':data.collector?.lastError?'采集器暂有异常，自动退避重试。':''}当前保留最后有效快照（${date(data.capturedAt)}）。`:`采集始于 ${date(data.startedAt)} · ${data.collector?.provider==='cloudflare'?'Cloudflare 云端':'备用快照'}目标每 ${data.expectedIntervalSeconds??15} 秒采集。大屏仅统计可确认的提交，不能代表官方完整提交历史。`;
 }
+function scopedTeams(state=data){return (state?.teams??[]).filter(t=>teamInSelectedRegion(t.id))}
 function renderStats(){
  if(!data)return;const day=$('#stats-day').value;if(!day)return;
- const stats=dayStatistics(records,data.teams,day),isToday=day===today;
- const cards=[{label:(isToday?'今日':'当日')+'已采集提交',value:stats.total,color:'blue',note:'按提交 ID 去重 · 实际提交日期'},{label:'活跃队伍',value:stats.activeTeams,note:`共 ${data.teams.length} 支已观察队伍`},{label:'已知结果通过率',value:stats.passRate===null?'—':stats.passRate.toFixed(1)+'%',color:'green',note:`Pass ${stats.groups.pass} / 未通过 ${stats.groups.failed}`},{label:'累计已采集提交',value:records.filter(r=>r.submissionId).length,note:'全部日期 · 按提交 ID 去重 · 不含无 ID 旧快照'},{label:isToday?'近 15 分钟提交':'最后一次提交',value:isToday?stats.recent:stats.latest?date(stats.latest).split(' ').at(-1):'—',note:`另有 ${stats.legacy} 条旧快照未计入次数`}];
+ const stats=dayStatistics(records,scopedTeams(),day),isToday=day===today;
+ const cards=[{label:(isToday?'今日':'当日')+'已采集提交',value:stats.total,color:'blue',note:'按提交 ID 去重 · 实际提交日期'},{label:'活跃队伍',value:stats.activeTeams,note:`共 ${scopedTeams().length} 支筛选队伍`},{label:'已知结果通过率',value:stats.passRate===null?'—':stats.passRate.toFixed(1)+'%',color:'green',note:`Pass ${stats.groups.pass} / 未通过 ${stats.groups.failed}`},{label:'累计已采集提交',value:records.filter(r=>r.submissionId).length,note:'全部日期 · 按提交 ID 去重 · 不含无 ID 旧快照'},{label:isToday?'近 15 分钟提交':'最后一次提交',value:isToday?stats.recent:stats.latest?date(stats.latest).split(' ').at(-1):'—',note:`另有 ${stats.legacy} 条旧快照未计入次数`}];
  $('#day-metrics').innerHTML=cards.map(c=>`<article><div class="metric-label">${c.label}</div><strong class="${c.color??''}">${esc(c.value)}</strong><small>${esc(c.note)}</small></article>`).join('');
  const max=Math.max(1,...stats.hours),peak=stats.hours.indexOf(max);
  $('#hour-summary').textContent=stats.total?`峰值 ${String(peak).padStart(2,'0')}:00 · ${max} 次`:'所选日期暂无可确认的提交';
  $('#hour-chart').innerHTML=stats.hours.map((count,h)=>`<button class="hour-column" type="button" data-hour="${h}" data-active="${selectedHour===h}" aria-label="${h}时，${count}次提交，点击筛选" aria-pressed="${selectedHour===h}" style="--height:${count?Math.max(3,count/max*85):1}%"><span class="hour-fill"></span>${count?`<span class="hour-number">${count}</span>`:''}</button>`).join('');
- const teamStats=selectedHour===null?stats:hourStatistics(records,data.teams,day,selectedHour);
+ const teamStats=selectedHour===null?stats:hourStatistics(records,scopedTeams(),day,selectedHour);
  $('#team-count-title').textContent=selectedHour===null?'队伍提交次数':`${String(selectedHour).padStart(2,'0')}:00–${String(selectedHour).padStart(2,'0')}:59 队伍次数`;
  $('#active-team-count').textContent=`${teamStats.activeTeams} 队 · ${teamStats.total} 次`;
  $('#team-counts').setAttribute('aria-label',selectedHour===null?'各队当日提交次数':'各队所选小时提交次数');
@@ -40,7 +41,7 @@ function renderStats(){
  const teams=teamStats.teams.filter(t=>showZero||t.count),teamMax=Math.max(1,...teams.map(t=>t.count));
  $('#team-counts').innerHTML=teams.map(t=>`<button class="team-count-row ${$('#record-team').value===t.id?'selected':''}" data-count-team="${esc(t.id)}" title="查看 ${esc(t.name)} 的 ${t.count} 次提交"><span>${esc(t.name)}${t.archived?' · 已离榜':''}</span><span class="team-count-track"><i style="width:${t.count/teamMax*100}%"></i></span><strong>${t.count}</strong></button>`).join('')||'<div class="record-empty">所选时段暂无可确认的提交。<br>可开启“显示零提交队伍”或切换日期。</div>';
 }
-function updateTeamOptions(){const sig=data.teams.map(t=>t.id+t.name).join('|');if(sig===optionsSignature)return;optionsSignature=sig;const selected=$('#record-team').value;$('#record-team').innerHTML='<option value="">全部队伍</option>'+[...data.teams].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN')).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}${t.archived?'（已离榜）':''}</option>`).join('');$('#record-team').value=selected}
+function updateTeamOptions(){const teams=scopedTeams(),sig=teams.map(t=>t.id+t.name).join('|');if(sig===optionsSignature)return;optionsSignature=sig;const selected=$('#record-team').value;$('#record-team').innerHTML='<option value="">全部队伍</option>'+[...teams].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN')).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}${t.archived?'（已离榜）':''}</option>`).join('');$('#record-team').value=selected}
 function filterOptions(){
  let from=beijingInputTime($('#record-from').value),to=beijingInputTime($('#record-to').value,true);const day=$('#stats-day').value;
  if($('#only-day').checked&&day){const begin=Date.parse(day+'T00:00:00+08:00'),end=begin+86400000-1;from=from===null?begin:Math.max(from,begin);to=to===null?end:Math.min(to,end)}
@@ -62,7 +63,7 @@ function renderList(){
  $('#record-updates').textContent=frozen?`列表已冻结${pending?` · 后台新增 ${pending} 条，恢复后显示`:''}`:newKeys.size?`本轮新增 ${newKeys.size} 条记录 · 自动更新中`:'云端采集继续 · 列表自动更新';
  $('#record-updates').classList.toggle('freeze-note',frozen);
 }
-function render(){if(!data)return;data=prefixData(data);records=submissionRecords(data);newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
+function render(){if(!data)return;data=prefixData(data);records=submissionRecords({...data,teams:scopedTeams()});newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
 function renderDetail(key){
  const r=shown.find(r=>r.key===key);if(!r)return;detailKey=key;
  $('#record-detail-title').textContent=r.teamName;
@@ -95,7 +96,7 @@ $('#clear-records').addEventListener('click',clearFilters);
 $('#clear-hour').addEventListener('click',()=>{selectedHour=null;$('#record-from').value='';$('#record-to').value='';page=1;renderStats();renderList()});
 $('#export-hour-teams').addEventListener('click',()=>{
  if(!data||selectedHour===null)return;
- const day=$('#stats-day').value,stats=hourStatistics(records,data.teams,day,selectedHour);
+ const day=$('#stats-day').value,stats=hourStatistics(records,scopedTeams(),day,selectedHour);
  const rows=[['统计日期(北京时间)','小时','队伍','提交次数'],...stats.teams.filter(t=>t.count).map(t=>[day,String(selectedHour).padStart(2,'0')+':00–'+String(selectedHour).padStart(2,'0')+':59',t.name,t.count])];
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`cann-hour-teams-${day}-${String(selectedHour).padStart(2,'0')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`已导出 ${stats.activeTeams} 支队伍的小时统计`);
 });
@@ -114,7 +115,7 @@ $('#export-records').addEventListener('click',()=>{
  const rows=filtered.map(r=>[r.teamName,r.submitter,r.status,r.submissionId,r.submittedAt?date(r.submittedAt):'',r.observedAt?date(r.observedAt):'',r.timeBasis,fmt(r.score),r.officialScore===null?'':fmt(r.officialScore),r.officialScoreAt?date(r.officialScoreAt):'',...shownData.tbest.flatMap((T,i)=>[r.times[i],T,pointScore(r.times[i],T)])]);
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+[header,...rows].map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='cann-submissions-'+beijingDay()+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`已导出 ${filtered.length} 条筛选记录`);
 });
-initTeamPrefixes({getData:()=>data,onChange:()=>{if(data){if(frozen&&shownData){shownData=prefixData(shownData);shown=submissionRecords(shownData)}render()}}});
+initTeamPrefixes({getData:()=>data,onChange:()=>{if(data){if(frozen&&shownData){shownData=prefixData(shownData);shown=submissionRecords({...shownData,teams:scopedTeams(shownData)})}render()}}});
 data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
 try{const config=await fetch('./data-source.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(6000)}).then(r=>r.json());if(/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(config.cloudflareEndpoint)){feed=createFeedClient(config.cloudflareEndpoint,{cache:storage.get('cloud-feed',null),save:state=>storage.set('cloud-feed',state)})}}catch{}
 const urlTeam=new URLSearchParams(location.search).get('team');if(urlTeam){$('#record-team').value=urlTeam;renderStats();renderList()}

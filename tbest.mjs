@@ -1,4 +1,4 @@
-import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs';
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261122-prefix';
 import {liveData,cache} from './lib/live-data.mjs';
 import {installIcons} from './lib/icons.mjs';
