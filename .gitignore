@@ -3,3 +3,6 @@ artifacts/
 *.log
 *.tmp
 .state/
+.wrangler/
+.dev.vars*
+.env*

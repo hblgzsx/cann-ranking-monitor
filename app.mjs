@@ -1,9 +1,11 @@
 import {pointScore,totalScore,validTime,bestHistoricalSubmission,resolveTbestOwners} from './lib/scoring.mjs?v=20261121-history';
 import {initAnalysis} from './lib/analysis-ui.mjs?v=20261121-analysis';
+import {createFeedClient} from './lib/feed.mjs?v=20261122-cloud';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,selectedChartAt=null,toastTimer;
 let nextCheckAt=Date.now()+15000;
+let cloudFeed=null,cloudEndpoint='',cloudStatus=null;
 const favoriteIds=new Set(storage.get('favorites',[]));
 const pinnedIds=new Set(storage.get('pinned-teams',[]));
 const remote='https://raw.githubusercontent.com/hblgzsx/cann-ranking-monitor/data/latest.json';
@@ -40,7 +42,15 @@ function renderPinPicker(){
  $('#pin-selection-count').textContent=`已选择 ${teams.filter(t=>pinnedIds.has(t.id)).length} 支队伍 · 勾选后立即保存`;
  $('#pin-list').innerHTML=matches.map(t=>`<label class="pin-option"><input type="checkbox" data-pin-id="${esc(t.id)}" ${pinnedIds.has(t.id)?'checked':''}><span><strong>${esc(t.name)}</strong><small>${esc(t.submitter)} · 官方 #${t.officialRank}</small></span></label>`).join('')||'<p class="muted">没有找到匹配的队伍</p>';
 }
-function freshness(){if(!data)return;const age=Math.max(0,Math.floor((Date.now()-Date.parse(data.capturedAt))/1000));$('#updated').textContent=`更新于 ${date(data.capturedAt)} · ${age<60?age+' 秒':Math.floor(age/60)+' 分钟'}前`;const stale=age>180;$('#notice').classList.toggle('warning',stale);$('#notice').textContent=stale?`数据已 ${Math.floor(age/60)} 分钟未更新，请查看采集状态。当前显示最后一次成功快照。`:`历史记录始于 ${date(data.startedAt)}（北京时间）。启动前的提交未包含在历史榜中。`;}
+function freshness(){
+ if(!data)return;
+ const age=Math.max(0,Math.floor((Date.now()-Date.parse(data.capturedAt))/1000)),interval=data.expectedIntervalSeconds??60;
+ $('#updated').textContent=`更新于 ${date(data.capturedAt)} · ${age<60?age+' 秒':Math.floor(age/60)+' 分钟'}前`;
+ const collector=cloudStatus??data.collector,stale=age>Math.max(60,interval*4),failed=!!collector?.lastError;
+ $('#notice').classList.toggle('warning',stale||failed);
+ const retry=collector?.nextAttemptAt&&collector.nextAttemptAt>Date.now()?`，约 ${Math.ceil((collector.nextAttemptAt-Date.now())/1000)} 秒后重试`:'';
+ $('#notice').textContent=failed?`采集或同步异常：${collector.lastError}${retry}。保留最后有效数据；后台目标间隔 ${interval} 秒。`:stale?`数据已 ${age<120?age+' 秒':Math.floor(age/60)+' 分钟'}未更新，请查看采集状态。当前显示最后一次成功快照。`:`历史记录始于 ${date(data.startedAt)}（北京时间）· ${collector?.provider==='cloudflare'?'Cloudflare 云端':'后台'}目标每 ${interval} 秒采集。仅记录采集到的提交，采样间隔中的提交仍可能遗漏。`;
+}
 function render(){
  const r=ranked(),owners=ownerLabels();
  $('#stat-teams').textContent=r.length;$('#stat-pass').textContent=`${r.filter(t=>/^pass$/i.test(t.status)).length} 支队伍当前通过`;
@@ -53,11 +63,12 @@ async function refresh(manual=false){
  if(busy||(!manual&&paused))return;busy=true;$('#refresh').disabled=true;$('#refresh').textContent='↻ 读取中…';
  try{
   let next,error;const previousAt=data?.capturedAt;
+  if(cloudFeed){try{next=await cloudFeed.read();cloudStatus=next.collector}catch(e){error=e;cloudStatus={...(cloudStatus??{}),lastError:'云端数据同步失败'}}}
   const urls=location.hostname==='localhost'||location.hostname==='127.0.0.1'?['./data/latest.json',remote]:[remote,'./data/latest.json'];
-  for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length||!Number.isFinite(Date.parse(candidate.capturedAt)))throw Error('无效快照');if(!next||Date.parse(candidate.capturedAt)>Date.parse(next.capturedAt))next=candidate;if(Date.now()-Date.parse(next.capturedAt)<=180000&&(!previousAt||Date.parse(next.capturedAt)>=Date.parse(previousAt)))break}catch(e){error=e}}
+  if(!next)for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length||!Number.isFinite(Date.parse(candidate.capturedAt)))throw Error('无效快照');if(!next||Date.parse(candidate.capturedAt)>Date.parse(next.capturedAt))next=candidate;if(Date.now()-Date.parse(next.capturedAt)<=180000&&(!previousAt||Date.parse(next.capturedAt)>=Date.parse(previousAt)))break}catch(e){error=e}}
   if(!next)throw error;
   const newer=!previousAt||Date.parse(next.capturedAt)>Date.parse(previousAt);
-  if(!data||newer){data=next;storage.set('cache',data);render()}
+  if(!data||newer){data=next;storage.set('cache',data);render()}else freshness();
   if(manual)toast(newer?`已更新到 ${date(data.capturedAt)} 的快照`:'已检查，暂无更新的快照');
  }catch(e){$('#notice').classList.add('warning');$('#notice').textContent=data?'同步失败，保留上次有效数据。请检查网络或稍后重试。':'暂时无法读取数据。首次采集可能尚未完成，请稍后刷新或查看采集状态。';if(manual)toast('同步失败，请稍后重试')}
  finally{busy=false;$('#refresh').disabled=false;$('#refresh').textContent='↻ 读取最新快照'}
@@ -104,7 +115,7 @@ function renderDetail(id){
 }
 function showTeam(id){if(selectedTeam!==id)selectedChartAt=null;selectedTeam=id;renderDetail(id);if(!$('#team-dialog').open)$('#team-dialog').showModal();location.hash='team='+encodeURIComponent(id)}
 const analysis=initAnalysis({getData:()=>data,getView:()=>view,getPinned:()=>[...pinnedIds],esc,fmt,time,date,toast});
-function pollStatus(){const remaining=Math.max(0,Math.ceil((nextCheckAt-Date.now())/1000));$('#poll-status').textContent=paused?'自动检查已暂停':document.hidden?'页面在后台 · 返回后检查':busy?'正在检查最新快照…':`下次检查 ${remaining} 秒 · 后台目标每 60 秒采集`}
+function pollStatus(){const remaining=Math.max(0,Math.ceil((nextCheckAt-Date.now())/1000));$('#poll-status').textContent=paused?'自动检查已暂停（后台采集继续）':document.hidden?'页面在后台 · 返回后检查':busy?'正在检查最新快照…':`下次检查 ${remaining} 秒 · 后台目标每 ${data?.expectedIntervalSeconds??15} 秒采集`}
 $('#theme').addEventListener('click',()=>{const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;try{localStorage.setItem('cann-monitor:theme',theme)}catch{};document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#0d111b':'#f6f8fc'});
 $('#refresh').addEventListener('click',()=>refresh(true));$('#pause').addEventListener('click',()=>{paused=!paused;$('#pause').textContent=paused?'▷ 恢复刷新':'Ⅱ 暂停刷新';$('#pause').setAttribute('aria-pressed',paused);pollStatus();if(!paused){nextCheckAt=Date.now()+15000;refresh()}});
 $('#search').addEventListener('input',e=>{query=e.target.value.trim().toLowerCase();renderTable()});$('#favorites').addEventListener('click',()=>{onlyFavorites=!onlyFavorites;$('#favorites').setAttribute('aria-pressed',onlyFavorites);renderTable()});
@@ -141,4 +152,6 @@ $('#export').addEventListener('click',()=>{
  const blob=new Blob(['\uFEFF'+[headers,...rows].map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`cann-${view}-${new Date(data.capturedAt).toISOString().replace(/[:.]/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出当前筛选结果及逐点基准分')
 });
 data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
+try{const config=await fetch('./data-source.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(6000)}).then(r=>r.json());if(config.cloudflareEndpoint&&/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(config.cloudflareEndpoint)){cloudEndpoint=config.cloudflareEndpoint;cloudFeed=createFeedClient(cloudEndpoint,{cache:storage.get('cloud-feed',null),save:state=>storage.set('cloud-feed',state)})}}catch{}
+if(cloudEndpoint){const link=$('footer a[href$="/actions"]');if(link){link.href=cloudEndpoint+'/api/head';link.title='查看实时采集心跳、错误和实际间隔';link.insertAdjacentHTML('afterend',`<a href="${cloudEndpoint}/api/gaps" target="_blank" rel="noopener">采集空档 ↗</a>`)}}
 await refresh();const match=location.hash.match(/^#team=(.+)$/);if(match&&data)showTeam(decodeURIComponent(match[1]));nextCheckAt=Date.now()+15000;pollStatus();setInterval(()=>{freshness();nextCheckAt=Date.now()+15000;if(!document.hidden)refresh();pollStatus()},15000);setInterval(pollStatus,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextCheckAt=Date.now()+15000;refresh()}pollStatus()});

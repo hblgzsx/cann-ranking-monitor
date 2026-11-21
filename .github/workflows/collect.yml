@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
+    if: vars.CANN_PRIMARY_COLLECTOR != 'cloudflare'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -26,7 +27,8 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
-      - name: Capture and publish every minute (short rolling run)
+      - name: Capture and publish every 15 seconds (fallback)
         env:
           DURATION_MINUTES: ${{ inputs.duration || '4' }}
+          POLL_INTERVAL_SECONDS: '15'
         run: node scripts/worker.mjs

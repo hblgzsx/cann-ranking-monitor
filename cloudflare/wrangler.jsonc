@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "cann-ranking-collector",
+  "account_id": "54881318f42b2784dd12e2e7f6c3efa4",
+  "main": "runtime.mjs",
+  "compatibility_date": "2026-11-21",
+  "workers_dev": true,
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+  "vars": { "PAUSED": "false", "COLLECT_UNTIL": "2026-12-05T04:45:00Z" },
+  "durable_objects": { "bindings": [{ "name": "SAMPLER", "class_name": "SamplingLoop" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SamplingLoop"] }],
+  "d1_databases": [{ "binding": "DB", "database_name": "cann-ranking-data", "database_id": "de3fadd1-e4a8-447f-aa64-ab056c287aa1" }]
+}

@@ -14,7 +14,7 @@
 - 状态配色适配深浅主题：Pass 绿、Wrong Answer 红、Runtime Error 紫、Compile Error 橙、Time Limit Exceeded 琥珀、Memory Limit Exceeded 青、Output Limit Exceeded 粉、排队/评测中蓝，并始终保留状态文字。
 - 点击“置顶队伍”可多选队伍，在同一张表的第 1 名前追加置顶行；完整榜单仍保留原记录和真实名次。置顶在三个榜单间共用，在当前浏览器持久保存，独立于搜索及仅关注筛选；CSV 只导出正常筛选结果，不重复置顶行。
 - 历史由独立 `data` 分支持久化，所有访问者共享；网页每 15 秒检查数据。
-- GitHub Actions 每 5 分钟启动一轮约 4 分钟的采集循环，循环内目标每分钟一次；短轮次用于减少长任务结束后的空档。GitHub 调度、Runner 启动和源站响应仍可能造成延迟，页面显示准确采集时间与过期提示。
+- 采集目标间隔 15 秒。提供 Cloudflare Workers + D1 主采集器：云端保存变化与心跳，网页合并历史；GitHub Actions 作为备用采集与每 6 小时备份。启用情况以 `data-source.json` 和仓库变量为准；平台调度、网络或限流退避会延长实际间隔。
 
 ## 计分
 
@@ -26,7 +26,7 @@
 
 ## 本地运行
 
-需要 Node.js 22+，无需安装依赖。
+本地采集、网页及测试需要 Node.js 22+，无需运行时依赖。Cloudflare 部署使用开发依赖 Wrangler，运行 `npm ci` 安装。
 
 ```powershell
 npm test
@@ -41,9 +41,9 @@ npm run serve
 - `main`：站点源码，推送触发 `Deploy GitHub Pages`，只发布静态资源和最后一次有效快照，不发布脚本、临时文件或凭据。
 - `data`：采集持久状态，根目录 `latest.json`。首次创建时从 main 建立分支并写入初始快照。
 - 仓库 Settings → Pages 的 Build and deployment 使用 **GitHub Actions**。
-- `Collect public ranking` 每 5 分钟定时启动，也可以手动运行；duration=0 只采一次，默认 4 分钟。每轮内约每分钟写入一个快照。
+- `Collect public ranking` 每 5 分钟定时启动，也可以手动运行；duration=0 只采一次，默认 4 分钟。备用轮次内目标每 15 秒写入一个快照；Cloudflare 启用后此任务跳过，避免双重采集。
 - 定时任务使用 UTC `*/5 * * * *`；公开仓库标准 Linux runner。2026-12-05 12:45（北京时间，比赛结束后 1 小时）起定时采集自动跳过，手动采集仍可执行。也可以在 Actions 禁用此工作流。
-- 采集只匿名 GET 官方公开接口，不需要任何账号、Cookie 或 Secret。GITHUB_TOKEN 仅由 Actions 用于本仓库 data 分支写入。
+- 采集只匿名 GET 官方公开接口，不需要任何账号、Cookie 或 Secret。GITHUB_TOKEN 仅由 Actions 用于本仓库 data 分支写入。Cloudflare 仅需 Worker + D1，不保存 GitHub 写入凭据。
 - 数据异常、隐藏/封榜、分页变化或网络失败时保留最后有效快照，页面会显示过期。Actions 的定时任务不是严格实时服务，允许排队、丢失中间提交和短暂停顿。
 - “读取最新快照”只立即检查后台已采集的数据，不会触发源站采集；没有更晚快照时明确提示“暂无更新的快照”。
 
@@ -54,4 +54,8 @@ npm run serve
 - 优化模拟：输入各点预计耗时，实时重算总分和预计名次；固定打开时的快照，不修改真实榜单。
 - 历史提交对比：比较两份完整已采集提交的耗时、得分与变化，统一使用当前 TBest。
 - 变动追踪：采集端比较前后快照，保留最近一次有意义的 TBest / 排名变动。排名旁显示该次升降；不表示全天累计。
-- 刷新倒计时：展示下一次前端检查时间；前端读取快照，后台采集目标 60 秒，网络与 Actions 排队会延迟。
+- 刷新倒计时：展示下一次前端检查时间；前端读取快照，后台采集目标 15 秒，网络与 Actions 排队会延迟。
+
+## Cloudflare 15 秒采集
+
+完整部署、配额与备份恢复说明见 [cloudflare/README.md](cloudflare/README.md)。云端增量不会直接覆盖历史；每 6 小时备份到 GitHub，验证不可变备份后才归档已备份的 D1 事件。页面读取失败时保留最后有效数据，并显示采集或同步异常。15 秒轮询仍不能保证捕获两次采样间被覆盖的中间提交。

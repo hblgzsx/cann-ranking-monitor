@@ -1,0 +1,12 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {createFeedClient} from '../lib/feed.mjs';
+const config=JSON.parse(await readFile('data-source.json','utf8'));
+if(!config.cloudflareEndpoint)throw Error('Cloudflare collector is not configured');
+const feed=createFeedClient(config.cloudflareEndpoint);
+await feed.read();const checkpoint=feed.checkpoint();
+const root=resolve(process.env.BACKUP_DIR??'.state');
+await writeFile(resolve(root,'latest.json'),JSON.stringify(checkpoint));
+await writeFile(resolve(root,'cloud-checkpoint.json'),JSON.stringify({version:randomUUID(),parentVersion:checkpoint._cloudFeed.baselineVersion,cursor:checkpoint._cloudFeed.cursor,pollCount:checkpoint._cloudFeed.pollCount,capturedAt:checkpoint.capturedAt}));
+console.log(`Backed up ${checkpoint.teams.length} teams through ${checkpoint.capturedAt}, cursor ${checkpoint._cloudFeed.cursor}.`);

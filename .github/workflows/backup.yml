@@ -1,0 +1,30 @@
+name: Backup Cloudflare ranking history
+on:
+  schedule:
+    - cron: '13 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ranking-collector
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: vars.CANN_PRIMARY_COLLECTOR == 'cloudflare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: data
+          path: .state
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+      - run: node scripts/backup-cloud.mjs
+      - name: Publish verified checkpoint
+        run: |
+          git -C .state add latest.json cloud-checkpoint.json
+          git -C .state -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Back up Cloudflare ranking history'
+          git -C .state push origin HEAD:data
