@@ -1,3 +1,5 @@
+import {installIcons} from './lib/icons.mjs';
+installIcons();
 import {pointScore,totalScore,validTime,bestHistoricalSubmission,resolveTbestOwners} from './lib/scoring.mjs?v=20261121-history';
 import {initAnalysis} from './lib/analysis-ui.mjs?v=20261121-analysis';
 import {createFeedClient} from './lib/feed.mjs?v=20261122-cloud';

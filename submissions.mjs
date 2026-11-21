@@ -1,3 +1,5 @@
+import {installIcons} from './lib/icons.mjs';
+installIcons();
 import {pointScore,totalScore,validTime} from './lib/scoring.mjs';
 import {createFeedClient} from './lib/feed.mjs';
 import {submissionRecords,filterSubmissions,beijingInputTime,beijingDay,dayStatistics,statusGroup} from './lib/submissions.mjs';
