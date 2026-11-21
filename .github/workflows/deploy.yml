@@ -23,7 +23,7 @@ jobs:
         run: |
           mkdir -p _site/lib _site/data
           cp index.html style.css app.mjs favicon.svg _site/
-          cp lib/scoring.mjs _site/lib/
+          cp lib/scoring.mjs lib/analytics.mjs lib/analysis-ui.mjs _site/lib/
           cp data/latest.json _site/data/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
