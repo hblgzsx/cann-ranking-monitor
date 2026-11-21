@@ -4,7 +4,7 @@ const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,toastTimer;
 const favoriteIds=new Set(storage.get('favorites',[]));
 const remote='https://raw.githubusercontent.com/hblgzsx/cann-ranking-monitor/data/latest.json';
-const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—';
+const fmt=n=>Number.isFinite(n)?(Math.abs(n)<.005?'0.00':n.toFixed(2)):'—';
 function time(t){if(!validTime(t))return '—';return t>=1e6?(t/1e6).toFixed(2)+' s':t>=1000?(t/1000).toFixed(2)+' ms':t.toFixed(2)+' μs'}
 function date(t,short=false){const d=new Date(t);return Number.isNaN(+d)?'—':new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',...(short?{}:{month:'2-digit',day:'2-digit'}),hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d)}
 function toast(s){clearTimeout(toastTimer);$('#toast').textContent=s;$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2600)}
@@ -26,7 +26,9 @@ function freshness(){if(!data)return;const age=Math.max(0,Math.floor((Date.now()
 function render(){const r=ranked();$('#stat-teams').textContent=r.length;$('#stat-pass').textContent=`${r.filter(t=>/^pass$/i.test(t.status)).length} 支队伍当前通过`;$('#stat-best').textContent=fmt(r[0]?.computed);$('#stat-leader').textContent=r[0]?.name??'等待数据';$('#stat-points').textContent=data.tbest.length;$('#stat-snapshots').textContent=data.snapshotCount??Math.max(0,...r.map(t=>t.observations??0));$('#stat-start').textContent=`始于 ${date(data.startedAt)}`;$('#history-count').textContent=r.length;$('#reference').innerHTML=data.tbest.map((t,i)=>`<div class="reference-item"><small>测试点 ${String(i+1).padStart(2,'0')}</small><strong>${time(t)}</strong></div>`).join('');freshness();renderTable();if(selectedTeam&&$('#team-dialog').open)renderDetail(selectedTeam)}
 async function refresh(manual=false){if(busy||(!manual&&paused))return;busy=true;$('#refresh').disabled=true;$('#refresh').textContent='↻ 同步中…';try{let next;const urls=location.hostname==='localhost'||location.hostname==='127.0.0.1'?['./data/latest.json',remote]:[remote,'./data/latest.json'];let error;for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length)throw Error('无效快照');if(!next||Date.parse(candidate.capturedAt)>Date.parse(next.capturedAt))next=candidate;break}catch(e){error=e}}if(!next)throw error;if(!data||Date.parse(next.capturedAt)>=Date.parse(data.capturedAt)){data=next;storage.set('cache',data);render()}if(manual)toast('已读取最新可用快照')}catch(e){$('#notice').classList.add('warning');$('#notice').textContent=data?'同步失败，保留上次有效数据。请检查网络或稍后重试。':'暂时无法读取数据。首次采集可能尚未完成，请稍后刷新或查看采集状态。';if(manual)toast('同步失败，请稍后重试')}finally{busy=false;$('#refresh').disabled=false;$('#refresh').textContent='↻ 立即刷新'}}
 function chart(history){
- const h=history.length?history:[{at:data.capturedAt,computed:0,official:0}],W=900,H=220,L=43,R=15,TOP=22,B=34,plotW=W-L-R,plotH=H-TOP-B;
+ const h=history.length?[...history]:[{at:data.capturedAt,computed:0,official:0}];
+ if(h.at(-1).at!==data.capturedAt)h.push({...h.at(-1),at:data.capturedAt});
+ const W=900,H=220,L=43,R=15,TOP=22,B=34,plotW=W-L-R,plotH=H-TOP-B;
  const start=Date.parse(h[0].at),end=Date.parse(data.capturedAt),span=Math.max(1,end-start);
  const x=p=>L+(Date.parse(p.at)-start)/span*plotW,y=v=>TOP+(100-Math.max(0,Math.min(100,v)))/100*plotH;
  const line=key=>h.map((p,i)=>`${i?'L':'M'}${x(p).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');

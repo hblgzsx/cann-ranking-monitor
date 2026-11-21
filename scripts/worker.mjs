@@ -1,6 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 const state=resolve('.state'),minutes=Number(process.env.DURATION_MINUTES??28),deadline=Date.now()+minutes*60000;
+if(process.env.GITHUB_EVENT_NAME==='schedule' && Date.now()>Date.parse('2026-12-05T04:45:00Z')){console.log('Contest ended; scheduled collection stopped. Manual collection remains available.');process.exit(0)}
 if(!Number.isFinite(minutes)||minutes<0||minutes>29)throw Error('Invalid worker duration');
 function run(cmd,args,options={}){const r=spawnSync(cmd,args,{stdio:'inherit',...options});if(r.status!==0)throw Error(`${cmd} exited ${r.status}`)}
 let success=0;
