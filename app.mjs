@@ -54,7 +54,7 @@ async function refresh(manual=false){
  try{
   let next,error;const previousAt=data?.capturedAt;
   const urls=location.hostname==='localhost'||location.hostname==='127.0.0.1'?['./data/latest.json',remote]:[remote,'./data/latest.json'];
-  for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length)throw Error('无效快照');next=candidate;break}catch(e){error=e}}
+  for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length||!Number.isFinite(Date.parse(candidate.capturedAt)))throw Error('无效快照');if(!next||Date.parse(candidate.capturedAt)>Date.parse(next.capturedAt))next=candidate;if(Date.now()-Date.parse(next.capturedAt)<=180000&&(!previousAt||Date.parse(next.capturedAt)>=Date.parse(previousAt)))break}catch(e){error=e}}
   if(!next)throw error;
   const newer=!previousAt||Date.parse(next.capturedAt)>Date.parse(previousAt);
   if(!data||newer){data=next;storage.set('cache',data);render()}
