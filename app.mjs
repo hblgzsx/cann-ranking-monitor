@@ -1,4 +1,4 @@
-import {pointScore,totalScore,validTime,currentBenchmarks} from './lib/scoring.mjs';
+import {pointScore,totalScore,validTime,currentBenchmarks} from './lib/scoring.mjs?v=20261121-current';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,toastTimer;
