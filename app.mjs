@@ -1,4 +1,4 @@
-import {liveData} from './lib/live-data.mjs?v=20261122-mobile';
+import {liveData} from './lib/live-data.mjs?v=20261123-shared-cache';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
@@ -67,10 +67,10 @@ async function refresh(manual=false){
  if(busy||(!manual&&paused))return;busy=true;$('#refresh').disabled=true;$('#refresh').textContent='↻ 读取中…';
  try{
   let next,error;const previousAt=data?.capturedAt;
-  if(cloudFeed){try{next=await cloudFeed.read();cloudStatus=next.connection?.mode==='backup'?{...next.collector,lastError:'实时连接失败：'+next.connection.message+'；当前为本站备用快照（部署时生成，实际新旧以采集时间为准）'}:next.collector}catch(e){error=e;cloudStatus={...(cloudStatus??{}),lastError:e.message??'云端数据同步失败'}}}
+  if(cloudFeed){try{next=await cloudFeed.read({force:manual});cloudStatus=next.connection?.mode==='backup'?{...next.collector,lastError:'实时连接暂未成功：'+next.connection.message+'；当前显示已保存数据，稍后自动重试'}:next.collector}catch(e){error=e;cloudStatus={...(cloudStatus??{}),lastError:e.message??'云端数据同步失败'}}}
   if(!next)throw error;
   const newer=!previousAt||Date.parse(next.capturedAt)>Date.parse(previousAt);
-  if(!data||newer){data=next;storage.set('cache',data);render()}else{data.connection=next.connection;freshness()}
+  if(!data||newer){data=next;render()}else{data.connection=next.connection;freshness()}
   if(manual)toast(next.connection?.mode==='backup'?`实时连接未成功，显示备用快照 ${date(data.capturedAt)}`:newer?`已更新到 ${date(data.capturedAt)} 的快照`:'实时连接正常，暂无更新的快照');
  }catch(e){$('#notice').classList.add('warning');$('#notice').textContent=data?'同步失败，保留上次有效数据。请检查网络或稍后重试。':'暂时无法读取数据。首次采集可能尚未完成，请稍后刷新或查看采集状态。';if(manual)toast('同步失败，请稍后重试')}
  finally{busy=false;$('#refresh').disabled=false;$('#refresh').textContent='↻ 读取最新快照'}
@@ -154,6 +154,5 @@ $('#export').addEventListener('click',()=>{
  const blob=new Blob(['\uFEFF'+[headers,...rows].map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`cann-${view}-${new Date(data.capturedAt).toISOString().replace(/[:.]/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出当前筛选结果及逐点基准分')
 });
 initTeamPrefixes({getData:()=>data,onChange:()=>{if(data)render()}});
-data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
-cloudFeed=await liveData();
+cloudFeed=await liveData();data=cloudFeed.cached;if(data)render();
 await refresh();const match=location.hash.match(/^#team=(.+)$/);if(match&&data)showTeam(decodeURIComponent(match[1]));nextCheckAt=Date.now()+15000;pollStatus();setInterval(()=>{freshness();nextCheckAt=Date.now()+15000;if(!document.hidden)refresh();pollStatus()},15000);setInterval(pollStatus,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextCheckAt=Date.now()+15000;refresh()}pollStatus()});

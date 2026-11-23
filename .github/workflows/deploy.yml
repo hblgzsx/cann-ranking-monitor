@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
+      - run: npm ci --ignore-scripts
       - run: npm test
       - name: Assemble static site
         run: |
@@ -25,6 +26,7 @@ jobs:
           cp team-prefixes.css tbest.html tbest.css tbest.mjs index.html submissions.html team.html style.css submissions.css team-analysis.css app.mjs submissions.mjs team.mjs favicon.svg data-source.json _site/
           cp lib/scoring.mjs lib/analytics.mjs lib/analysis-ui.mjs lib/feed.mjs lib/submissions.mjs lib/team-report.mjs lib/live-data.mjs lib/icons.mjs lib/team-analysis-ui.mjs lib/tbest-history.mjs lib/tbest-analysis.mjs lib/team-prefixes.mjs lib/team-prefix-ui.mjs lib/region-manager.mjs lib/network.mjs _site/lib/
           cp data/latest.json _site/data/
+          cp lib/snapshot-store.mjs _site/lib/
           touch _site/.nojekyll
       - name: Prepare current same-origin fallback snapshot
         run: node scripts/publish-mobile-snapshot.mjs

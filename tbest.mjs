@@ -1,13 +1,13 @@
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261122-prefix';
-import {liveData,cache} from './lib/live-data.mjs?v=20261122-mobile';
+import {liveData,cache} from './lib/live-data.mjs?v=20261123-shared-cache';
 import {installIcons} from './lib/icons.mjs';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',pct=n=>(n>0?'+':'')+fmt(n)+'%',time=n=>n>=1000?fmt(n/1000)+' ms':fmt(n)+' μs';
 const date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t)):'—';
 const colors=['#3b82f6','#10b981','#f59e0b','#a78bfa','#f472b6','#06b6d4','#e57373','#84b43e','#cb8c38','#7186dd'];
 const directionName={faster:'参考变快',slower:'参考回退',owner:'归属变更'};
-let data=cache.get('cache'),report=null,client=null,busy=false,selectedAt=null,selectedEventKey=null,page=1,hidden=new Set(),teamSignature='',impactTeamId='',toastTimer;
+let data=null,report=null,client=null,busy=false,selectedAt=null,selectedEventKey=null,page=1,hidden=new Set(),teamSignature='',impactTeamId='',toastTimer;
 function ownerHtml(owner){return `<span>${owner.teams.length?owner.teams.map(t=>`<a href="./team.html?team=${encodeURIComponent(t.id)}">${esc(t.name)}</a>`).join(' / '):'未采集到归属'}</span>${owner.method==='observed-match'?'<small>历史耗时匹配 · 归属未核实</small>':owner.method==='official-id'?'<small>官方提交 ID 已核对</small>':''}${owner.id?`<small title="官方 TBest 提交 ID">${esc(owner.id)}</small>`:'<small>未保存官方提交 ID</small>'}`}
 function getFrom(){return $('#range').value==='all'?null:Date.now()-Number($('#range').value)*3600000}
 function updateReport(){report=tbestReport(data,{from:getFrom(),caseIndex:$('#event-case').value==='all'?null:Number($('#event-case').value),direction:$('#event-direction').value})}
@@ -67,10 +67,10 @@ function render(){
  $('#screen-notice').textContent=`最新快照 ${date(data.capturedAt)} · TBest 记录始于 ${date(report.history[0]?.at)} · 每 15 秒检查。仅反映已观察到的官方基准变化。`;
  connectionNotice();const stale=data.connection?.mode==='backup'||Date.now()-Date.parse(data.capturedAt)>90000;$('#screen-notice').classList.toggle('warning',stale);if(stale)$('#screen-notice').textContent+=' 数据已过期，正在重试。';
 }
-function connectionNotice(){if(data?.connection?.mode==='backup'){$('#screen-notice').classList.add('warning');$('#screen-notice').textContent='实时连接未成功：'+data.connection.message+'。显示本站备用快照 '+date(data.capturedAt)+'（部署时生成，实际新旧以采集时间为准）。'}}
-async function refresh(){if(busy||!client)return;busy=true;$('#refresh').disabled=true;try{const next=await client.read();if(!data||Date.parse(next.capturedAt)>Date.parse(data.capturedAt)){data=next;render()}else{data.connection=next.connection;render()}}catch{$('#screen-notice').textContent='同步失败，保留最后有效数据；稍后自动重试。';$('#screen-notice').classList.add('warning')}finally{busy=false;$('#refresh').disabled=false}}
+function connectionNotice(){if(data?.connection?.mode==='backup'){$('#screen-notice').classList.add('warning');$('#screen-notice').textContent='实时连接未成功：'+data.connection.message+'。显示已保存数据 '+date(data.capturedAt)+'，稍后自动重试。'}}
+async function refresh(force=false){if(busy||!client)return;busy=true;$('#refresh').disabled=true;try{const next=await client.read({force:force===true});if(!data||Date.parse(next.capturedAt)>Date.parse(data.capturedAt)){data=next;render()}else{data.connection=next.connection;render()}}catch{$('#screen-notice').textContent='同步失败，保留最后有效数据；稍后自动重试。';$('#screen-notice').classList.add('warning')}finally{busy=false;$('#refresh').disabled=false}}
 function selectAt(at,key=null){selectedAt=at;selectedEventKey=key;renderChart();renderEvents()}
-$('#range').addEventListener('change',()=>{page=1;selectedAt=null;render()});$('#refresh').addEventListener('click',refresh);
+$('#range').addEventListener('change',()=>{page=1;selectedAt=null;render()});$('#refresh').addEventListener('click',()=>refresh(true));
 for(const id of ['chart-case','chart-mode'])$('#'+id).addEventListener('change',renderChart);
 $('#chart-point').addEventListener('change',e=>selectAt(e.target.value));
 for(const [id,offset] of [['previous-point',-1],['next-point',1]])$('#'+id).addEventListener('click',()=>{const rows=report.visibleHistory,index=rows.findIndex(p=>p.at===selectedAt),target=rows[index+offset];if(target)selectAt(target.at)});
@@ -88,4 +88,4 @@ $('#export').addEventListener('click',()=>{
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='cann-tbest-changes.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 initTeamPrefixes({getData:()=>data,onChange:render});
-installIcons();render();client=await liveData();await refresh();setInterval(()=>{if(!document.hidden)refresh()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+installIcons();client=await liveData();data=client.cached;render();await refresh();setInterval(()=>{if(!document.hidden)refresh()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});

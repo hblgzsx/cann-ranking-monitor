@@ -1,4 +1,4 @@
-import {liveData} from './lib/live-data.mjs?v=20261122-mobile';
+import {liveData} from './lib/live-data.mjs?v=20261123-shared-cache';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
@@ -20,7 +20,7 @@ function freshness(){
  $('#updated').textContent=`快照 ${date(data.capturedAt)} · ${age<60?age+' 秒':Math.floor(age/60)+' 分钟'}前 · ${busy?'更新中':document.hidden?'后台显示暂停':`每 ${data.expectedIntervalSeconds??15} 秒检查`}`;
  const problem=refreshFailed||age>90||data.collector?.lastError;
  $('#screen-notice').classList.toggle('warning',!!problem);
- $('#screen-notice').textContent=problem?`${refreshFailed?'实时连接未成功（'+(data.connection?.message??'网络不可达')+'），当前显示本站备用快照，部署时生成，实际新旧以采集时间为准。':data.collector?.lastError?'采集器暂有异常，自动退避重试。':''}当前保留最后有效快照（${date(data.capturedAt)}）。`:`采集始于 ${date(data.startedAt)} · ${data.collector?.provider==='cloudflare'?'Cloudflare 云端':'备用快照'}目标每 ${data.expectedIntervalSeconds??15} 秒采集。大屏仅统计可确认的提交，不能代表官方完整提交历史。`;
+ $('#screen-notice').textContent=problem?`${refreshFailed?'实时连接暂未成功（'+(data.connection?.message??'网络不可达')+'），稍后自动重试。':data.collector?.lastError?'采集器暂有异常，自动退避重试。':''}当前显示已保存数据（${date(data.capturedAt)}）。`:`采集始于 ${date(data.startedAt)} · ${data.collector?.provider==='cloudflare'?'Cloudflare 云端':'备用快照'}目标每 ${data.expectedIntervalSeconds??15} 秒采集。大屏仅统计可确认的提交，不能代表官方完整提交历史。`;
 }
 function scopedTeams(state=data){return (state?.teams??[]).filter(t=>teamInSelectedRegion(t.id))}
 function renderStats(){
@@ -73,10 +73,10 @@ function renderDetail(key){
 async function refresh(manual=false){
  if(busy)return;busy=true;$('#refresh').disabled=true;
  try{
-  let candidate,error;if(feed)try{candidate=await feed.read()}catch(e){error=e}
+  let candidate,error;if(feed)try{candidate=await feed.read({force:manual})}catch(e){error=e}
   if(!candidate)throw error;
   refreshFailed=candidate.connection?.mode==='backup';
-  if(!data||Date.parse(candidate.capturedAt)>Date.parse(data.capturedAt)){data=candidate;storage.set('cache',data);render()}else{data.connection=candidate.connection;freshness()}
+  if(!data||Date.parse(candidate.capturedAt)>Date.parse(data.capturedAt)){data=candidate;render()}else{data.connection=candidate.connection;freshness()}
   if(manual)toast(refreshFailed?'云端暂不可用，显示最后有效数据':'已检查最新提交记录');
  }catch{refreshFailed=true;if(data)freshness();else{$('#screen-notice').textContent='暂时无法读取共享数据，请稍后重试。';$('#screen-notice').classList.add('warning')}if(manual)toast('同步失败，保留原有记录')}
  finally{busy=false;lastCheck=Date.now();$('#refresh').disabled=false}
@@ -115,8 +115,7 @@ $('#export-records').addEventListener('click',()=>{
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+[header,...rows].map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='cann-submissions-'+beijingDay()+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`已导出 ${filtered.length} 条筛选记录`);
 });
 initTeamPrefixes({getData:()=>data,onChange:()=>{if(data){if(frozen&&shownData){shownData=prefixData(shownData);shown=submissionRecords({...shownData,teams:scopedTeams(shownData)})}render()}}});
-data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
-feed=await liveData();
+feed=await liveData();data=feed.cached;if(data)render();
 const urlTeam=new URLSearchParams(location.search).get('team');if(urlTeam){$('#record-team').value=urlTeam;renderStats();renderList()}
 clock();setInterval(clock,1000);await refresh();if(urlTeam){$('#record-team').value=urlTeam;renderStats();renderList()}
 setInterval(()=>{if(!document.hidden)refresh()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastCheck>5000)refresh()});
