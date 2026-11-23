@@ -57,7 +57,18 @@ export default {
   try{
    if(url.pathname==='/api/head'){
     const head=await env.DB.prepare('SELECT baseline_version,baseline_url,baseline_cursor,baseline_poll_count,seq,poll_count,success_at,attempt_at,next_attempt_at,error,failures,last_gap_seconds,max_gap_seconds FROM monitor_head WHERE id=1').first();
-    return head?reply({protocol:1,intervalSeconds:15,...head}):reply({error:'Collector is not initialized'},503);
+    return head?reply({protocol:1,intervalSeconds:15,...head,baseline_proxy_url:url.origin+'/api/baseline?version='+encodeURIComponent(head.baseline_version)}):reply({error:'Collector is not initialized'},503);
+   }
+   if(url.pathname==='/api/baseline'){
+    const head=await env.DB.prepare('SELECT baseline_url,baseline_version FROM monitor_head WHERE id=1').first();
+    if(!head)return reply({error:'Collector is not initialized'},503);
+    if(url.searchParams.get('version')!==head.baseline_version)return reply({error:'Checkpoint changed; retry head'},409);
+    if(!/^https:\/\/raw\.githubusercontent\.com\/hblgzsx\/cann-ranking-monitor\/[a-f0-9]{40}\/latest\.json$/.test(head.baseline_url))return reply({error:'Invalid checkpoint source'},503);
+    const cache=globalThis.caches?.default,cacheKey=new Request(head.baseline_url),cached=cache&&await cache.match(cacheKey);
+    if(cached)return cached;
+    const upstream=await fetch(head.baseline_url,{signal:AbortSignal.timeout(12000)});if(!upstream.ok)return reply({error:'Checkpoint temporarily unavailable'},502);
+    const response=new Response(upstream.body,{headers:{...headers,'Cache-Control':'public, max-age=300'}});
+    if(cache)await cache.put(cacheKey,response.clone());return response;
    }
    if(url.pathname==='/api/events'){
     const after=Number(url.searchParams.get('after')??0),through=Number(url.searchParams.get('through')??Number.MAX_SAFE_INTEGER);

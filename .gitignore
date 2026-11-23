@@ -6,3 +6,5 @@ artifacts/
 .wrangler/
 .dev.vars*
 .env*
+
+_site/

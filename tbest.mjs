@@ -1,6 +1,6 @@
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261122-prefix';
-import {liveData,cache} from './lib/live-data.mjs';
+import {liveData,cache} from './lib/live-data.mjs?v=20261122-mobile';
 import {installIcons} from './lib/icons.mjs';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',pct=n=>(n>0?'+':'')+fmt(n)+'%',time=n=>n>=1000?fmt(n/1000)+' ms':fmt(n)+' μs';
@@ -65,9 +65,10 @@ function render(){
  if(!data.teams.some(t=>t.id===impactTeamId))impactTeamId=cache.get('pinned-teams',[]).find(id=>data.teams.some(t=>t.id===id))??data.teams[0].id;$('#impact-team').value=impactTeamId;
  renderMetrics();renderChart();renderCases();renderEvents();
  $('#screen-notice').textContent=`最新快照 ${date(data.capturedAt)} · TBest 记录始于 ${date(report.history[0]?.at)} · 每 15 秒检查。仅反映已观察到的官方基准变化。`;
- const stale=Date.now()-Date.parse(data.capturedAt)>90000;$('#screen-notice').classList.toggle('warning',stale);if(stale)$('#screen-notice').textContent+=' 数据已过期，正在重试。';
+ connectionNotice();const stale=data.connection?.mode==='backup'||Date.now()-Date.parse(data.capturedAt)>90000;$('#screen-notice').classList.toggle('warning',stale);if(stale)$('#screen-notice').textContent+=' 数据已过期，正在重试。';
 }
-async function refresh(){if(busy||!client)return;busy=true;$('#refresh').disabled=true;try{const next=await client.read();if(!data||Date.parse(next.capturedAt)>Date.parse(data.capturedAt)){data=next;render()}}catch{$('#screen-notice').textContent='同步失败，保留最后有效数据；稍后自动重试。';$('#screen-notice').classList.add('warning')}finally{busy=false;$('#refresh').disabled=false}}
+function connectionNotice(){if(data?.connection?.mode==='backup'){$('#screen-notice').classList.add('warning');$('#screen-notice').textContent='实时连接未成功：'+data.connection.message+'。显示本站备用快照 '+date(data.capturedAt)+'（部署时生成，实际新旧以采集时间为准）。'}}
+async function refresh(){if(busy||!client)return;busy=true;$('#refresh').disabled=true;try{const next=await client.read();if(!data||Date.parse(next.capturedAt)>Date.parse(data.capturedAt)){data=next;render()}else{data.connection=next.connection;render()}}catch{$('#screen-notice').textContent='同步失败，保留最后有效数据；稍后自动重试。';$('#screen-notice').classList.add('warning')}finally{busy=false;$('#refresh').disabled=false}}
 function selectAt(at,key=null){selectedAt=at;selectedEventKey=key;renderChart();renderEvents()}
 $('#range').addEventListener('change',()=>{page=1;selectedAt=null;render()});$('#refresh').addEventListener('click',refresh);
 for(const id of ['chart-case','chart-mode'])$('#'+id).addEventListener('change',renderChart);

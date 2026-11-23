@@ -1,9 +1,9 @@
+import {liveData} from './lib/live-data.mjs?v=20261122-mobile';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime,bestHistoricalSubmission,resolveTbestOwners} from './lib/scoring.mjs?v=20261121-history';
-import {initAnalysis} from './lib/analysis-ui.mjs?v=20261121-analysis';
-import {createFeedClient} from './lib/feed.mjs?v=20261122-cloud';
+import {initAnalysis} from './lib/analysis-ui.mjs?v=20261122-mobile';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,selectedChartAt=null,toastTimer;
@@ -67,13 +67,11 @@ async function refresh(manual=false){
  if(busy||(!manual&&paused))return;busy=true;$('#refresh').disabled=true;$('#refresh').textContent='↻ 读取中…';
  try{
   let next,error;const previousAt=data?.capturedAt;
-  if(cloudFeed){try{next=await cloudFeed.read();cloudStatus=next.collector}catch(e){error=e;cloudStatus={...(cloudStatus??{}),lastError:'云端数据同步失败'}}}
-  const urls=location.hostname==='localhost'||location.hostname==='127.0.0.1'?['./data/latest.json',remote]:[remote,'./data/latest.json'];
-  if(!next)for(const url of urls){try{const res=await fetch(`${url}?t=${Date.now()}`,{cache:'no-store',signal:AbortSignal.timeout(14000)});if(!res.ok)throw Error('HTTP '+res.status);const candidate=await res.json();if(candidate.schemaVersion!==1||!candidate.teams?.length||!candidate.tbest?.length||!Number.isFinite(Date.parse(candidate.capturedAt)))throw Error('无效快照');if(!next||Date.parse(candidate.capturedAt)>Date.parse(next.capturedAt))next=candidate;if(Date.now()-Date.parse(next.capturedAt)<=180000&&(!previousAt||Date.parse(next.capturedAt)>=Date.parse(previousAt)))break}catch(e){error=e}}
+  if(cloudFeed){try{next=await cloudFeed.read();cloudStatus=next.connection?.mode==='backup'?{...next.collector,lastError:'实时连接失败：'+next.connection.message+'；当前为本站备用快照（部署时生成，实际新旧以采集时间为准）'}:next.collector}catch(e){error=e;cloudStatus={...(cloudStatus??{}),lastError:e.message??'云端数据同步失败'}}}
   if(!next)throw error;
   const newer=!previousAt||Date.parse(next.capturedAt)>Date.parse(previousAt);
-  if(!data||newer){data=next;storage.set('cache',data);render()}else freshness();
-  if(manual)toast(newer?`已更新到 ${date(data.capturedAt)} 的快照`:'已检查，暂无更新的快照');
+  if(!data||newer){data=next;storage.set('cache',data);render()}else{data.connection=next.connection;freshness()}
+  if(manual)toast(next.connection?.mode==='backup'?`实时连接未成功，显示备用快照 ${date(data.capturedAt)}`:newer?`已更新到 ${date(data.capturedAt)} 的快照`:'实时连接正常，暂无更新的快照');
  }catch(e){$('#notice').classList.add('warning');$('#notice').textContent=data?'同步失败，保留上次有效数据。请检查网络或稍后重试。':'暂时无法读取数据。首次采集可能尚未完成，请稍后刷新或查看采集状态。';if(manual)toast('同步失败，请稍后重试')}
  finally{busy=false;$('#refresh').disabled=false;$('#refresh').textContent='↻ 读取最新快照'}
 }
@@ -157,5 +155,5 @@ $('#export').addEventListener('click',()=>{
 });
 initTeamPrefixes({getData:()=>data,onChange:()=>{if(data)render()}});
 data=storage.get('cache',null);if(data?.schemaVersion===1&&data.teams?.length)render();else data=null;
-try{const config=await fetch('./data-source.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(6000)}).then(r=>r.json());if(config.cloudflareEndpoint&&/^https:\/\/[a-z0-9.-]+\.workers\.dev$/.test(config.cloudflareEndpoint)){cloudEndpoint=config.cloudflareEndpoint;cloudFeed=createFeedClient(cloudEndpoint,{cache:storage.get('cloud-feed',null),save:state=>storage.set('cloud-feed',state)})}}catch{}
+cloudFeed=await liveData();
 await refresh();const match=location.hash.match(/^#team=(.+)$/);if(match&&data)showTeam(decodeURIComponent(match[1]));nextCheckAt=Date.now()+15000;pollStatus();setInterval(()=>{freshness();nextCheckAt=Date.now()+15000;if(!document.hidden)refresh();pollStatus()},15000);setInterval(pollStatus,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextCheckAt=Date.now()+15000;refresh()}pollStatus()});
