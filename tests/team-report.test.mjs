@@ -24,6 +24,14 @@ test('priority analysis switches the submitting person by submission ID even for
  assert.equal(analyzeTeamSubmission(report,data.tbest,'a2').selected.submitter,'并列提交人');assert.equal(analyzeTeamSubmission(report,data.tbest,'latest').selected.submitter,'最新提交人');
 });
 
+test('analysis does not substitute another ID with identical times or mistake an undated current submission for an older one',()=>{
+ const report=buildTeamReport(data,'a');
+ const missing={...report,best:{submissionId:'not-retained',times:report.records[0].times}};assert.equal(analyzeTeamSubmission(missing,data.tbest,'best').selected,null);
+ const undated={...report,team:{submissionId:'current'},records:[...report.records,{key:'current-key',submissionId:'current',times:[40,40],eventAt:null,submitter:'当前提交人'}]};
+ assert.equal(analyzeTeamSubmission(undated,data.tbest,'latest').selected.submissionId,'current');
+ const unknownReference=buildTeamReport({...data,tbest:[null,10]},'a');assert.equal(unknownReference.points[0].ratio,null);
+});
+
 test('case minima cite exact submissions, include ties, and never invent missing provenance',()=>{
  const r=buildTeamReport(data,'a');assert.equal(r.caseSources[0].sources[0].submissionId,'a1');assert.equal(r.caseSources[1].sources[0].submissionId,'a2');
  const team={historical:[10,2,null,1.0000001],history:[{submissionId:'old',at:'2026-11-21T00:00:00Z',latest:[10,null,null,null]},{at:'2026-11-20T00:00:00Z',latest:[10,2,null,null]}]};
