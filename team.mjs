@@ -1,5 +1,5 @@
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
-import {initSubmissionAnalysis} from './lib/team-analysis-ui.mjs?v=20261124-share';
+import {initSubmissionAnalysis} from './lib/team-analysis-ui.mjs?v=20261124-metadata';
 import {installIcons} from './lib/icons.mjs';
 import {buildTeamReport} from './lib/team-report.mjs?v=20261124-sources';
 import {filterSubmissions,beijingDay,statusGroup} from './lib/submissions.mjs?v=20261124-cases';

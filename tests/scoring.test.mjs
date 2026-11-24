@@ -1,11 +1,28 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {pointScore,totalScore,mergeSnapshot,parseTime,bestHistoricalSubmission,observedSubmissions,resolveTbestOwners} from '../lib/scoring.mjs';
+import {pointScore,totalScore,mergeSnapshot,parseTime,bestHistoricalSubmission,observedSubmissions,resolveTbestOwners,rankingSubmissionMetadata} from '../lib/scoring.mjs';
 import {normalizeRanking} from '../lib/source.mjs';
 test('official logarithmic scoring and arithmetic mean',()=>{assert.equal(pointScore(10,10),100);assert.equal(pointScore(15,10),50);assert.ok(Math.abs(pointScore(22.5,10)-100/3)<1e-10);assert.equal(totalScore([10,15],[10,10]),75);assert.equal(totalScore([null,10],[10,10]),50)});
 test('invalid and superseded reference times never produce NaN or negative scores',()=>{for(const t of [null,0,-1,NaN,Infinity,'10'])assert.equal(pointScore(t,10),0);assert.equal(pointScore(5,10),100);assert.equal(pointScore(10,0),0)});
 test('convert display units to microseconds',()=>{assert.equal(parseTime('6.51 ms'),6510);assert.equal(parseTime('2.66 μs'),2.66);assert.equal(parseTime('200 ns'),.2);assert.equal(parseTime('-'),null)});
 test('best historical submission never combines points from separate submissions',()=>{const team={historical:[2,50],submissions:[{submissionId:'a',times:[2,100]},{submissionId:'b',times:[10,50]}]};const best=bestHistoricalSubmission(team,[2,50]);assert.deepEqual(best.times,[2,100]);assert.equal(best.submissionId,'a');assert.ok(best.score<totalScore(team.historical,[2,50]))});
 test('best historical submission is selected again when official TBest changes',()=>{const team={submissions:[{submissionId:'a',times:[1,10]},{submissionId:'b',times:[3,3]}]};assert.equal(bestHistoricalSubmission(team,[1,1]).submissionId,'a');assert.equal(bestHistoricalSubmission(team,[.1,1]).submissionId,'b')});
+
+test('ranking metadata follows the winning submission identity, never the latest submitter',()=>{
+ const team={submissionId:'latest',submitter:'乙',status:'Wrong Answer',submittedAt:'2026-11-24T02:00:00Z',latest:[20,null],submissions:[{submissionId:'winner',submitter:'甲',status:'Pass',submittedAt:'2026-11-24T01:00:00Z',times:[10,10]}]};
+ const ranked={...team,bestSubmission:bestHistoricalSubmission(team,[10,10])};
+ const chosen=rankingSubmissionMetadata(ranked,'single');assert.equal(chosen.submissionId,'winner');assert.equal(chosen.submitter,'甲');assert.equal(chosen.status,'Pass');assert.equal(chosen.submittedAt,'2026-11-24T01:00:00Z');
+ assert.equal(rankingSubmissionMetadata(ranked,'official').submitter,'乙');assert.equal(rankingSubmissionMetadata(ranked,'history'),null);
+ const unknown=rankingSubmissionMetadata({...ranked,bestSubmission:{submissionId:'old'}},'single');assert.equal(unknown.submitter,null);assert.equal(unknown.status,null);assert.equal(unknown.submittedAt,null);
+ assert.equal(rankingSubmissionMetadata({...ranked,bestSubmission:null},'single').submitter,null);
+});
+
+test('TBest reselection and repeated collection preserve each submission author with its vector',()=>{
+ const first={...snap('2026-11-24T01:00:00Z'),teams:[{id:'x',submissionId:'a',submitter:'甲',status:'Pass',submittedAt:'2026-11-24T00:59:00Z',latest:[1,10]}]};
+ const second={...snap('2026-11-24T02:00:00Z'),teams:[{id:'x',submissionId:'b',submitter:'乙',status:'Pass',submittedAt:'2026-11-24T01:59:00Z',latest:[3,3]}]};
+ const state=mergeSnapshot(mergeSnapshot(null,first),second),team=state.teams[0];
+ assert.equal(bestHistoricalSubmission(team,[1,1]).submitter,'甲');assert.equal(bestHistoricalSubmission(team,[.1,1]).submitter,'乙');
+ const old=observedSubmissions(team,2).find(s=>s.submissionId==='a');assert.deepEqual(old.times,[1,10]);assert.equal(old.submitter,'甲');assert.equal(old.submittedAt,first.teams[0].submittedAt);
+});
 test('legacy history migration preserves vectors without inventing submission metadata',()=>{const t={history:[{at:'2026-11-21T01:00:00Z',latest:[2,100]},{at:'2026-11-21T02:00:00Z',latest:[2,100]},{at:'2026-11-21T03:00:00Z',latest:[10,50]}]};const s=observedSubmissions(t,2);assert.equal(s.length,2);assert.equal(s[0].submissionId,'');assert.equal(s[0].submittedAt,null);assert.equal(s[0].observedAt,t.history[0].at)});
 test('equal-score submissions prefer a known source identity',()=>{const t={history:[{at:'2026-11-21T01:00:00Z',latest:[10,10]}],latest:[10,10],submissionId:'known',submittedAt:'2026-11-21T02:00:00Z'};assert.equal(bestHistoricalSubmission(t,[10,10]).submissionId,'known')});
 test('a pending submission is updated when its judging result becomes available',()=>{const team={submissions:[{submissionId:'same',times:[null,null],observedAt:'2026-11-21T01:00:00Z'}],history:[{at:'2026-11-21T01:00:15Z',submissionId:'same',latest:[10,null]}],latest:[12,15],submissionId:'same',lastSeen:'2026-11-21T01:00:30Z'};const records=observedSubmissions(team,2);assert.equal(records.length,1);assert.deepEqual(records[0].times,[12,15]);assert.equal(records[0].observedAt,'2026-11-21T01:00:00Z');assert.equal(bestHistoricalSubmission(team,[10,10]).score,totalScore([12,15],[10,10]))});

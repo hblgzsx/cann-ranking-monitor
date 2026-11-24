@@ -17,6 +17,13 @@ test('latest selection follows submission time, stable IDs survive updates and T
  const legacy={...report,records:[{key:'old',times:[30,30]},{key:'best-old',times:[10,10]}],best:{submissionId:'',times:[10,10]}};assert.equal(analyzeTeamSubmission(legacy,data.tbest,'best').selected.key,'best-old');
 });
 
+test('priority analysis switches the submitting person by submission ID even for identical vectors',()=>{
+ const own={...data.teams[0],latest:[40,40],submissionId:'new',submitter:'最新提交人',status:'Wrong Answer',submittedAt:'2026-11-21T03:00:00Z',submissions:[{submissionId:'a1',submitter:'历史提交人',status:'Pass',times:[10,30],submittedAt:'2026-11-21T01:00:00Z'},{submissionId:'a2',submitter:'并列提交人',status:'Pass',times:[10,30],submittedAt:'2026-11-21T02:00:00Z'}]};
+ const report=buildTeamReport({...data,teams:[own]},'a');
+ const best=analyzeTeamSubmission(report,data.tbest,'best').selected;assert.equal(best.submissionId,'a1');assert.equal(best.submitter,'历史提交人');
+ assert.equal(analyzeTeamSubmission(report,data.tbest,'a2').selected.submitter,'并列提交人');assert.equal(analyzeTeamSubmission(report,data.tbest,'latest').selected.submitter,'最新提交人');
+});
+
 test('case minima cite exact submissions, include ties, and never invent missing provenance',()=>{
  const r=buildTeamReport(data,'a');assert.equal(r.caseSources[0].sources[0].submissionId,'a1');assert.equal(r.caseSources[1].sources[0].submissionId,'a2');
  const team={historical:[10,2,null,1.0000001],history:[{submissionId:'old',at:'2026-11-21T00:00:00Z',latest:[10,null,null,null]},{at:'2026-11-20T00:00:00Z',latest:[10,2,null,null]}]};
