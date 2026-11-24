@@ -14,7 +14,7 @@ test('checkpoint adoption archives only backed-up cursors and preserves newer ev
 test('a missing backup cannot delete cloud history',async()=>{const env=database();await capture(env,{now:()=>0,request:async()=>raw()});const old=globalThis.fetch;globalThis.fetch=async()=>new Response(null,{status:404});try{await adoptCheckpoint(env);assert.equal(env.sqlite.prepare('SELECT baseline_version FROM monitor_head').get().baseline_version,'initial');assert.equal(env.sqlite.prepare('SELECT count(*) n FROM monitor_events').get().n,1)}finally{globalThis.fetch=old;env.sqlite.close()}});
 
 test('a valid deployed checkpoint skips the older baseline and rejects impossible seed cursors',async()=>{
- const s=sourceFromState(mergeSnapshot(null,{capturedAt:at(0),tbest:[10],teams:[{id:'t',name:'A',latest:[10]}]})),baseline=mergeSnapshot(null,s),urls=[];
+ const s=sourceFromState(mergeSnapshot(null,{capturedAt:at(0),testcaseIds:['p'],tbest:[10],teams:[{id:'t',name:'A',latest:[10]}]})),baseline=mergeSnapshot(null,s),urls=[];
  const seed={...baseline,_cloudFeed:{cursor:5,pollCount:10,source:s}};
  const fetcher=async url=>{urls.push(url);if(url.includes('/api/head'))return Response.json({protocol:1,baseline_url:'https://raw.test/base',baseline_cursor:3,baseline_poll_count:6,seq:5,poll_count:11,success_at:at(15000)});return Response.json({...baseline,_cloudFeed:{cursor:3,pollCount:6,source:s}})};
  const feed=createFeedClient('https://collector.test',{fetcher,loadSeed:async()=>seed});assert.equal((await feed.read()).capturedAt,at(15000));assert.equal(urls.length,1);assert.equal(feed.checkpoint()._cloudFeed.cursor,5);

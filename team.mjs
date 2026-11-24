@@ -2,9 +2,10 @@ import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-r
 import {initSubmissionAnalysis} from './lib/team-analysis-ui.mjs';
 import {installIcons} from './lib/icons.mjs';
 import {buildTeamReport} from './lib/team-report.mjs';
-import {filterSubmissions,beijingDay,statusGroup} from './lib/submissions.mjs';
-import {pointScore,validTime} from './lib/scoring.mjs';
-import {liveData,cache} from './lib/live-data.mjs?v=20261123-shared-cache';
+import {filterSubmissions,beijingDay,statusGroup} from './lib/submissions.mjs?v=20261124-cases';
+import {pointScore,validTime} from './lib/scoring.mjs?v=20261124-cases';
+import {liveData,cache} from './lib/live-data.mjs?v=20261124-cases';
+import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t)):'未记录',time=t=>validTime(t)?t>=1000?(t/1000).toFixed(2)+' ms':t.toFixed(2)+' μs':'—';
 const statusClass=s=>({'Pass':'pass','Wrong Answer':'wrong-answer','Runtime Error':'runtime-error','Compile Error':'compile-error','Time Limit Exceeded':'time-limit','Memory Limit Exceeded':'memory-limit','Output Limit Exceeded':'output-limit'}[s]??(statusGroup(s)==='pending'?'pending':'unknown'));
@@ -20,7 +21,7 @@ function render(){if(!data?.teams?.length)return;data=prefixData(data);if(!data.
  $('#rival-body').innerHTML=report.points.map(p=>`<tr><th>点 ${p.index+1}</th><td class="numeric mono">${time(p.time)}<small>${fmt(p.score)} 分</small></td><td class="numeric mono">${rival?time(p.opponentTime):'—'}<small>${rival?fmt(p.opponentScore)+' 分':'无对手'}</small></td><td class="numeric mono muted">${time(p.T)}</td><td class="numeric mono ${p.contribution>0?'green':p.contribution<0?'loss':''}">${p.contribution===null?'—':(p.contribution>0?'+':'')+fmt(p.contribution)}</td></tr>`).join('');
  $('#activity-quality').textContent=`状态未记录 ${report.groups.unknown} 份，评测中 ${report.groups.pending} 份；这些记录未参与通过率计算。点击提交 ID 可分析测试点。`;
  $('#recent-body').innerHTML=filterSubmissions(report.records).slice(0,12).map(r=>`<tr><td class="mono">${date(r.eventAt)}${r.timeBasis!=='submitted'?'<small>首次采集时间</small>':''}</td><td>${esc(r.submitter??'未记录')}</td><td><span class="status ${statusClass(r.status)}">${esc(r.status??'未记录')}</span></td><td class="numeric mono blue">${fmt(r.score)}</td><td class="record-id" title="${esc(r.submissionId)}"><button class="quiet-button mono submission-id-button" data-analyze="${esc(r.key)}" title="分析此提交测试点">${esc(r.submissionId||'无 ID · 旧快照')}</button></td></tr>`).join('');
- $('#team-all-records').href='./submissions.html?team='+encodeURIComponent(teamId);$('#screen-notice').textContent=`快照 ${date(data.capturedAt)} · 全部重算统一使用当前官方 TBest · 页面每 15 秒检查新数据。`;
+ $('#team-all-records').href='./submissions.html?team='+encodeURIComponent(teamId);$('#screen-notice').textContent=`快照 ${date(data.capturedAt)} · 全部重算统一使用当前官方 TBest · 页面每 15 秒检查新数据。${referenceNotice(data)}`;
  connectionNotice();const stale=data.connection?.mode==='backup'||Date.now()-Date.parse(data.capturedAt)>90000;$('#screen-notice').classList.toggle('warning',stale);if(stale)$('#screen-notice').textContent+=' 当前数据已过期，正在重试。';
  submissionAnalysis.render();
 }

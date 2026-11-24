@@ -1,9 +1,10 @@
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
-import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261122-prefix';
-import {liveData,cache} from './lib/live-data.mjs?v=20261123-shared-cache';
+import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261124-cases';
+import {liveData,cache} from './lib/live-data.mjs?v=20261124-cases';
 import {installIcons} from './lib/icons.mjs';
+import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',pct=n=>(n>0?'+':'')+fmt(n)+'%',time=n=>n>=1000?fmt(n/1000)+' ms':fmt(n)+' μs';
+const valid=n=>Number.isFinite(n)&&n>0,fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',pct=n=>Number.isFinite(n)?(n>0?'+':'')+fmt(n)+'%':'—',time=n=>!valid(n)?'未公开 / 待参考':n>=1000?fmt(n/1000)+' ms':fmt(n)+' μs';
 const date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t)):'—';
 const colors=['#3b82f6','#10b981','#f59e0b','#a78bfa','#f472b6','#06b6d4','#e57373','#84b43e','#cb8c38','#7186dd'];
 const directionName={faster:'参考变快',slower:'参考回退',owner:'归属变更'};
@@ -28,13 +29,13 @@ function renderChart(){
  const selectedIndex=rows.findIndex(p=>p.at===selectedAt);$('#previous-point').disabled=selectedIndex<=0;$('#next-point').disabled=selectedIndex>=rows.length-1;
  if(!ids.length){$('#tbest-chart').innerHTML='<div class="analysis-empty">请点击上方图例显示至少一个测试点。</div>'}else{
   const W=1100,H=290,L=65,R=24,T=25,B=32,start=Math.max(getFrom()??Date.parse(rows[0].at),Date.parse(rows[0].at)),end=Math.max(start+1000,Date.parse(data.capturedAt));
-  const x=at=>L+Math.max(0,Date.parse(at)-start)/(end-start)*(W-L-R),value=(p,i)=>raw?p.tbest[i]:p.tbest[i]/report.start.tbest[i]*100;
-  const values=rows.flatMap(p=>ids.map(i=>value(p,i))),min=Math.min(...values),max=Math.max(...values),pad=Math.max((max-min)*.12,max*.025,raw?.001:1),lo=Math.max(0,min-pad),hi=max+pad,y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  const x=at=>L+Math.max(0,Date.parse(at)-start)/(end-start)*(W-L-R),value=(p,i)=>!valid(p.tbest[i])?null:raw?p.tbest[i]:valid(report.cases[i].start)?p.tbest[i]/report.cases[i].start*100:null;
+  const values=rows.flatMap(p=>ids.map(i=>value(p,i))).filter(Number.isFinite),min=values.length?Math.min(...values):0,max=values.length?Math.max(...values):100,pad=Math.max((max-min)*.12,max*.025,raw?.001:1),lo=Math.max(0,min-pad),hi=max+pad,y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
   const chartRows=[...rows,{...rows.at(-1),at:data.capturedAt}];
-  const steps=i=>chartRows.map((p,j)=>j?`H${x(p.at)}V${y(value(p,i))}`:`M${x(p.at)},${y(value(p,i))}`).join(' ');
-  $('#tbest-chart').innerHTML=`<svg class="tbest-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="官方 TBest 变化阶梯图">${Array.from({length:5},(_,j)=>{const v=lo+(hi-lo)*j/4;return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="4 5"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(v)}${raw?'':'%'}</text>`}).join('')}${ids.map(i=>`<path d="${steps(i)}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="2"/>`).join('')}${rows.map(p=>`<g role="button" tabindex="0" data-at="${esc(p.at)}" aria-label="选择 ${date(p.at)} TBest 记录"><line x1="${x(p.at)}" x2="${x(p.at)}" y1="${T}" y2="${H-B}" stroke="${p.at===selectedAt?'var(--blue)':'transparent'}" stroke-width="1" stroke-dasharray="3 4"/><rect x="${x(p.at)-6}" y="${T}" width="12" height="${H-T-B}" fill="transparent"/>${ids.map(i=>`<circle cx="${x(p.at)}" cy="${y(value(p,i))}" r="${p.at===selectedAt?4:2.3}" fill="${colors[i%colors.length]}"/>`).join('')}<title>${esc(date(p.at)+' · '+(report.range.filter(e=>e.at===p.at).map(tbestChangeText).join(' / ')||'首次基准')+' · '+ids.map(i=>'点'+(i+1)+' '+time(p.tbest[i])).join(' / '))}</title></g>`).join('')}<text x="${L}" y="${H-7}">${date(new Date(start).toISOString())}</text><text x="${W-R}" y="${H-7}" text-anchor="end">${date(data.capturedAt)}</text></svg>`;
+  const steps=i=>{let drawing=false;return chartRows.map(p=>{const v=value(p,i);if(v===null){drawing=false;return ''}const command=drawing?`H${x(p.at)}V${y(v)}`:`M${x(p.at)},${y(v)}`;drawing=true;return command}).join(' ')};
+  $('#tbest-chart').innerHTML=`<svg class="tbest-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="官方 TBest 变化阶梯图">${Array.from({length:5},(_,j)=>{const v=lo+(hi-lo)*j/4;return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="4 5"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(v)}${raw?'':'%'}</text>`}).join('')}${ids.map(i=>`<path d="${steps(i)}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="2"/>`).join('')}${rows.map(p=>`<g role="button" tabindex="0" data-at="${esc(p.at)}" aria-label="选择 ${date(p.at)} TBest 记录"><line x1="${x(p.at)}" x2="${x(p.at)}" y1="${T}" y2="${H-B}" stroke="${p.at===selectedAt?'var(--blue)':'transparent'}" stroke-width="1" stroke-dasharray="3 4"/><rect x="${x(p.at)-6}" y="${T}" width="12" height="${H-T-B}" fill="transparent"/>${ids.filter(i=>value(p,i)!==null).map(i=>`<circle cx="${x(p.at)}" cy="${y(value(p,i))}" r="${p.at===selectedAt?4:2.3}" fill="${colors[i%colors.length]}"/>`).join('')}<title>${esc(date(p.at)+' · '+(report.range.filter(e=>e.at===p.at).map(tbestChangeText).join(' / ')||'首次基准')+' · '+ids.map(i=>'点'+(i+1)+' '+time(p.tbest[i])).join(' / '))}</title></g>`).join('')}<text x="${L}" y="${H-7}">${date(new Date(start).toISOString())}</text><text x="${W-R}" y="${H-7}" text-anchor="end">${date(data.capturedAt)}</text></svg>`;
  }
- $('#chart-readout').innerHTML=ids.map(i=>`<div><small>点 ${i+1} · 所选记录</small><strong style="color:${colors[i%colors.length]}">${time(selected.tbest[i])}</strong><span>对比范围起点 ${pct((selected.tbest[i]/report.start.tbest[i]-1)*100)}</span></div>`).join('');
+ $('#chart-readout').innerHTML=ids.map(i=>`<div><small>点 ${i+1} · 所选记录</small><strong style="color:${colors[i%colors.length]}">${time(selected.tbest[i])}</strong><span>对比该点首个有效基准 ${pct(valid(selected.tbest[i])&&valid(report.cases[i].start)?(selected.tbest[i]/report.cases[i].start-1)*100:null)}</span></div>`).join('');
  renderChangeAttribution(selected.at,ids);renderImpact();
 }
 function renderChangeAttribution(at,visibleCases){
@@ -64,7 +65,7 @@ function render(){
  if(signature!==teamSignature){teamSignature=signature;$('#impact-team').innerHTML=[...data.teams].sort((a,b)=>a.name.localeCompare(b.name,'zh-CN')).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}${t.archived?'（已离榜）':''}</option>`).join('')}
  if(!data.teams.some(t=>t.id===impactTeamId))impactTeamId=cache.get('pinned-teams',[]).find(id=>data.teams.some(t=>t.id===id))??data.teams[0].id;$('#impact-team').value=impactTeamId;
  renderMetrics();renderChart();renderCases();renderEvents();
- $('#screen-notice').textContent=`最新快照 ${date(data.capturedAt)} · TBest 记录始于 ${date(report.history[0]?.at)} · 每 15 秒检查。仅反映已观察到的官方基准变化。`;
+ $('#screen-notice').textContent=`最新快照 ${date(data.capturedAt)} · TBest 记录始于 ${date(report.history[0]?.at)} · 每 15 秒检查。仅反映已观察到的官方基准变化。${referenceNotice(data)}`;
  connectionNotice();const stale=data.connection?.mode==='backup'||Date.now()-Date.parse(data.capturedAt)>90000;$('#screen-notice').classList.toggle('warning',stale);if(stale)$('#screen-notice').textContent+=' 数据已过期，正在重试。';
 }
 function connectionNotice(){if(data?.connection?.mode==='backup'){$('#screen-notice').classList.add('warning');$('#screen-notice').textContent='实时连接未成功：'+data.connection.message+'。显示已保存数据 '+date(data.capturedAt)+'，稍后自动重试。'}}

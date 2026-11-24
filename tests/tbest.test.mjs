@@ -10,7 +10,7 @@ test('TBest ledger keeps changes and ownership without adding heartbeat points o
  data=mergeSnapshot(data,snap(2,[8,20]));data=mergeSnapshot(data,snap(3,[8,25]));data=mergeSnapshot(data,snap(4,[8,25],['s3','s2']));
  assert.equal(data.tbestHistory.length,4);const report=tbestReport(data);assert.equal(report.faster,1);assert.equal(report.slower,1);assert.equal(report.ownerChanges,1);assert.equal(report.changeCount,2);assert.equal(report.batchCount,2);
  const trimmed={...data,teams:data.teams.map(t=>({...t,history:[]}))};assert.equal(tbestReport(trimmed).history[0].at,at(0));
- const reset=mergeSnapshot(data,{...snap(5),testcaseIds:['new','b']});assert.equal(reset.tbestHistory.length,1);
+ const expanded=mergeSnapshot(data,{...snap(5),testcaseIds:['new','b']});assert.equal(expanded.tbestHistory.length,5);assert.deepEqual(expanded.tbestHistory[0].tbest,[null,20]);
 });
 test('legacy recovery de-duplicates shared snapshots, ignores malformed vectors and preserves observed timestamps',()=>{
  const data={...snap(4,[8,25]),teams:[{id:'t',history:[{at:at(0),tbest:[10,20]},{at:at(2),tbest:[8,20]},{at:at(3),tbest:[8,25]},{at:at(1),tbest:[NaN,20]}]},{id:'u',history:[{at:at(0),tbest:[10,20]},{at:at(2),tbest:[8,20]}]}]};
