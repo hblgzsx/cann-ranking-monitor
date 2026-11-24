@@ -4,7 +4,7 @@ import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefi
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime,bestHistoricalSubmission,resolveTbestOwners} from './lib/scoring.mjs?v=20261124-cases';
-import {initAnalysis} from './lib/analysis-ui.mjs?v=20261122-mobile';
+import {initAnalysis} from './lib/analysis-ui.mjs?v=20261124-share';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,selectedChartAt=null,toastTimer;
@@ -31,6 +31,7 @@ function renderTable(){
  $('#result-count').textContent=`${teams.length} / ${ranked().length} 支队伍`;
  const head=(label,key,cls='')=>`<th class="${cls}"><button class="sort-head" data-sort="${key}" title="点击排序">${label}${sortKey===key?(ascending?' ↑':' ↓'):''}</button></th>`;
  $('#table-head').innerHTML=`<tr><th>排名</th>${head('队伍 / 最新提交者','name')}<th>最新状态</th>${head(hist?'逐点组合分':single?'最佳单次重算分':'官方分数','score','numeric')}${recomputed?head('官方分','official','numeric')+'<th class="numeric">分差</th>':''}<th>TBest</th>${data.tbest.map((_,i)=>head(`点 ${i+1}`,'point'+i,'numeric')).join('')}${single?'<th>所选历史提交</th>':head('最新提交','time')}</tr>`;
+ $('#reference-body').innerHTML=`<tr class="ranking-reference-row"><th colspan="2"><strong>TBest</strong><small>当前官方参考耗时</small></th><td><span class="status pass">基准</span></td><td class="numeric muted">—</td>${recomputed?'<td class="numeric muted">—</td><td class="numeric muted">—</td>':''}<td class="mono">${best.length} 点</td>${best.map((T,i)=>`<td class="numeric mono"><strong>${time(T)}</strong><small>${data.tbestStatus?.[i]==='retained'?'保留参考 · 暂估':validTime(T)?'参考分 100':'等待参考'}</small></td>`).join('')}<td class="mono muted">${date(data.capturedAt)}</td></tr>`;
  const row=t=>{
   const times=viewTimes(t),bestCount=times.filter((v,i)=>validTime(v)&&validTime(best[i])&&v<=best[i]*1.000001).length,score=hist?t.computed:single?(t.bestSubmission?.score??0):t.officialScore;
   const submissionLabel=t.bestSubmission?.submittedAt?date(t.bestSubmission.submittedAt):t.bestSubmission?.observedAt?'采集于 '+date(t.bestSubmission.observedAt):'—';

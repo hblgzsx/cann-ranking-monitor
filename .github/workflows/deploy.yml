@@ -28,6 +28,10 @@ jobs:
           cp data/latest.json _site/data/
           cp lib/snapshot-store.mjs _site/lib/
           cp lib/case-evolution.mjs _site/lib/
+          cp share-images.css _site/
+          cp lib/share-images.mjs _site/lib/
+          mkdir -p _site/lib/vendor
+          cp lib/vendor/html-to-image.mjs lib/vendor/html-to-image.LICENSE _site/lib/vendor/
           touch _site/.nojekyll
       - name: Prepare current same-origin fallback snapshot
         run: node scripts/publish-mobile-snapshot.mjs
