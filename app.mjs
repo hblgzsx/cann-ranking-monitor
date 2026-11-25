@@ -1,3 +1,4 @@
+import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
 import {liveData} from './lib/live-data.mjs?v=20261124-cases';
 import {referenceNotice,incompleteStatus} from './lib/case-evolution.mjs?v=20261124-cases';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
@@ -62,7 +63,7 @@ function freshness(){
  $('#notice').textContent=failed?`采集或同步异常：${collector.lastError}${retry}。保留最后有效数据；后台目标间隔 ${interval} 秒。`:stale?`数据已 ${age<120?age+' 秒':Math.floor(age/60)+' 分钟'}未更新，请查看采集状态。当前显示最后一次成功快照。`:`历史记录始于 ${date(data.startedAt)}（北京时间）· ${collector?.provider==='cloudflare'?'Cloudflare 云端':'后台'}目标每 ${interval} 秒采集。仅记录采集到的提交，采样间隔中的提交仍可能遗漏。`;
  $('#notice').textContent+=' '+referenceNotice(data);
 }
-function render(){
+function render(){setCaseCatalog(data?.testcaseIds);
  data=prefixData(data);
  const r=ranked(),owners=ownerLabels();
  $('#stat-teams').textContent=r.length;$('#stat-pass').textContent=`${r.filter(t=>/^pass$/i.test(t.status)).length} 支队伍当前通过`;

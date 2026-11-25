@@ -1,3 +1,4 @@
+import {setCaseCatalog,selectedCaseIndices} from './lib/case-display.mjs?v=20261125-case-display';
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261124-cases';
 import {liveData,cache} from './lib/live-data.mjs?v=20261124-cases';
@@ -18,10 +19,11 @@ function renderMetrics(){
  $('#tbest-metrics').innerHTML=cards.map(([label,value,note])=>`<article><div class="metric-label">${label}</div><strong>${value}</strong><small>${note}</small></article>`).join('');
 }
 function renderChart(){
- const focus=$('#chart-case').value,raw=$('#chart-mode').value==='raw'&&focus!=='all',ids=focus==='all'?data.tbest.map((_,i)=>i).filter(i=>!hidden.has(i)):[Number(focus)];
+ const visible=selectedCaseIndices($('.reference-chart-card'),data.tbest.length),focus=$('#chart-case').value,raw=$('#chart-mode').value==='raw'&&focus!=='all',ids=focus==='all'?data.tbest.map((_,i)=>i).filter(i=>!hidden.has(i)):[Number(focus)];
+ const selectedIds=ids.filter(i=>visible.includes(i));ids.splice(0,ids.length,...selectedIds);
  $('#chart-mode').disabled=focus==='all';if(focus==='all')$('#chart-mode').value='relative';
  $('#chart-description').textContent=`记录始于 ${date(report.history[0]?.at)} · 图中基线 ${date(report.start.at)}${focus==='all'?' · 点击图例隐藏或显示测试点':' · 可切换实际耗时纵轴'}`;
- $('#case-legend').innerHTML=data.tbest.map((_,i)=>`<button data-toggle-case="${i}" aria-label="显示或隐藏点 ${i+1}" aria-pressed="${focus==='all'?!hidden.has(i):Number(focus)===i}" style="--case-color:${colors[i%colors.length]}"><i></i>点 ${i+1}</button>`).join('');
+ $('#case-legend').innerHTML=data.tbest.map((_,i)=>i).filter(i=>visible.includes(i)).map(i=>`<button data-toggle-case="${i}" aria-label="显示或隐藏点 ${i+1}" aria-pressed="${focus==='all'?!hidden.has(i):Number(focus)===i}" style="--case-color:${colors[i%colors.length]}"><i></i>点 ${i+1}</button>`).join('');
  const rows=report.visibleHistory.length?report.visibleHistory:[report.last];
  if(!rows.some(p=>p.at===selectedAt)){selectedAt=rows.at(-1)?.at;selectedEventKey=null}
  const selected=report.history.find(p=>p.at===selectedAt)??report.last;
@@ -33,7 +35,7 @@ function renderChart(){
   const values=rows.flatMap(p=>ids.map(i=>value(p,i))).filter(Number.isFinite),min=values.length?Math.min(...values):0,max=values.length?Math.max(...values):100,pad=Math.max((max-min)*.12,max*.025,raw?.001:1),lo=Math.max(0,min-pad),hi=max+pad,y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
   const chartRows=[...rows,{...rows.at(-1),at:data.capturedAt}];
   const steps=i=>{let drawing=false;return chartRows.map(p=>{const v=value(p,i);if(v===null){drawing=false;return ''}const command=drawing?`H${x(p.at)}V${y(v)}`:`M${x(p.at)},${y(v)}`;drawing=true;return command}).join(' ')};
-  $('#tbest-chart').innerHTML=`<svg class="tbest-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="官方 TBest 变化阶梯图">${Array.from({length:5},(_,j)=>{const v=lo+(hi-lo)*j/4;return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="4 5"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(v)}${raw?'':'%'}</text>`}).join('')}${ids.map(i=>`<path d="${steps(i)}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="2"/>`).join('')}${rows.map(p=>`<g role="button" tabindex="0" data-at="${esc(p.at)}" aria-label="选择 ${date(p.at)} TBest 记录"><line x1="${x(p.at)}" x2="${x(p.at)}" y1="${T}" y2="${H-B}" stroke="${p.at===selectedAt?'var(--blue)':'transparent'}" stroke-width="1" stroke-dasharray="3 4"/><rect x="${x(p.at)-6}" y="${T}" width="12" height="${H-T-B}" fill="transparent"/>${ids.filter(i=>value(p,i)!==null).map(i=>`<circle cx="${x(p.at)}" cy="${y(value(p,i))}" r="${p.at===selectedAt?4:2.3}" fill="${colors[i%colors.length]}"/>`).join('')}<title>${esc(date(p.at)+' · '+(report.range.filter(e=>e.at===p.at).map(tbestChangeText).join(' / ')||'首次基准')+' · '+ids.map(i=>'点'+(i+1)+' '+time(p.tbest[i])).join(' / '))}</title></g>`).join('')}<text x="${L}" y="${H-7}">${date(new Date(start).toISOString())}</text><text x="${W-R}" y="${H-7}" text-anchor="end">${date(data.capturedAt)}</text></svg>`;
+  $('#tbest-chart').innerHTML=`<svg class="tbest-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="官方 TBest 变化阶梯图">${Array.from({length:5},(_,j)=>{const v=lo+(hi-lo)*j/4;return `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="4 5"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(v)}${raw?'':'%'}</text>`}).join('')}${ids.map(i=>`<path data-case-index="${i}" d="${steps(i)}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="2"/>`).join('')}${rows.map(p=>`<g role="button" tabindex="0" data-at="${esc(p.at)}" aria-label="选择 ${date(p.at)} TBest 记录"><line x1="${x(p.at)}" x2="${x(p.at)}" y1="${T}" y2="${H-B}" stroke="${p.at===selectedAt?'var(--blue)':'transparent'}" stroke-width="1" stroke-dasharray="3 4"/><rect x="${x(p.at)-6}" y="${T}" width="12" height="${H-T-B}" fill="transparent"/>${ids.filter(i=>value(p,i)!==null).map(i=>`<circle data-case-index="${i}" cx="${x(p.at)}" cy="${y(value(p,i))}" r="${p.at===selectedAt?4:2.3}" fill="${colors[i%colors.length]}"/>`).join('')}<title>${esc(date(p.at)+' · '+(report.range.filter(e=>e.at===p.at).map(tbestChangeText).join(' / ')||'首次基准')+' · '+ids.map(i=>'点'+(i+1)+' '+time(p.tbest[i])).join(' / '))}</title></g>`).join('')}<text x="${L}" y="${H-7}">${date(new Date(start).toISOString())}</text><text x="${W-R}" y="${H-7}" text-anchor="end">${date(data.capturedAt)}</text></svg>`;
  }
  $('#chart-readout').innerHTML=ids.map(i=>`<div><small>点 ${i+1} · 所选记录</small><strong style="color:${colors[i%colors.length]}">${time(selected.tbest[i])}</strong><span>对比该点首个有效基准 ${pct(valid(selected.tbest[i])&&valid(report.cases[i].start)?(selected.tbest[i]/report.cases[i].start-1)*100:null)}</span></div>`).join('');
  renderChangeAttribution(selected.at,ids);renderImpact();
@@ -52,13 +54,13 @@ function renderImpact(){
  $('#impact-result').innerHTML=`<div class="impact-result"><div><small>变更前基准下得分</small><strong>${fmt(result.before)}</strong></div><div><small>变更后基准下得分</small><strong>${fmt(result.after)}</strong></div><div><small>纯基准影响</small><strong class="${result.delta<0?'loss':'green'}">${result.delta>0?'+':''}${fmt(result.delta)}</strong></div></div><div class="impact-context">变化首次观察于 <b>${date(event.at)}</b> · 此批次涉及 ${report.range.filter(e=>e.at===event.at&&e.direction!=='owner').length} 个耗时变化点<br>固定提交：${esc(result.submission.submissionId||'无 ID 旧快照')} · ${esc(result.team.name)}<br>此提交按当前全部历史重新选择为最佳单次，其耗时在两种基准计算中保持一致。<a class="blue" href="./team.html?team=${encodeURIComponent(result.team.id)}${result.submission.submissionId?'&submission='+encodeURIComponent(result.submission.submissionId):''}">查看该提交战报 ↗</a></div>`;
 }
 function renderEvents(){
- const rows=[...report.events].reverse(),pages=Math.max(1,Math.ceil(rows.length/40));page=Math.min(Math.max(1,page),pages);
- $('#event-count').textContent=`${rows.length} 条匹配变更 · 所有统计卡按时间范围计算`;
+ const visible=selectedCaseIndices($('#event-table').closest('.record-panel'),data.tbest.length),rows=[...report.events].filter(e=>visible.includes(e.index)).reverse(),pages=Math.max(1,Math.ceil(rows.length/40));page=Math.min(Math.max(1,page),pages);
+ $('#event-count').textContent=`${rows.length} 条匹配变更 · 仅显示选中 case，统计卡仍按全部 case 计算`;
  $('#event-body').innerHTML=rows.slice((page-1)*40,page*40).map(e=>`<tr class="${e.at===selectedAt?'selected':''}"><td class="mono">${date(e.at)}${e.current.evidence==='legacy'?'<small class="range-note muted">旧快照重建</small>':''}</td><th>点 ${e.index+1}</th><td class="${e.direction==='faster'?'green':e.direction==='slower'?'tbest-net-bad':'muted'}">${directionName[e.direction]}</td><td class="numeric mono">${time(e.before)} → ${time(e.after)}</td><td class="numeric mono ${e.changePct<0?'green':e.changePct>0?'tbest-net-bad':''}">${pct(e.changePct)}</td><td class="tbest-owner">${ownerHtml(e.owner)}</td><td><button class="quiet-button" data-event="${esc(e.key)}">分析 ↗</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">所选范围没有匹配变更，可扩大范围或修改筛选。</td></tr>';
  $('#event-page').textContent=`第 ${page} / ${pages} 页 · 共 ${rows.length} 条`;
  $('#previous-page').disabled=page===1;$('#next-page').disabled=page===pages;
 }
-function render(){
+function render(){setCaseCatalog(data?.testcaseIds);
  if(!data?.tbest?.length)return;data=prefixData(data);
  for(const id of ['chart-case','event-case']){const select=$('#'+id);if(select.options.length!==data.tbest.length+1)select.innerHTML='<option value="all">全部测试点</option>'+data.tbest.map((_,i)=>`<option value="${i}">点 ${i+1}</option>`).join('')}
  updateReport();const signature=data.teams.map(t=>t.id+t.name).join('|');
@@ -84,9 +86,11 @@ $('#previous-page').addEventListener('click',()=>{page--;renderEvents()});$('#ne
 $('#tbest-chart').addEventListener('click',e=>{const b=e.target.closest('[data-at]');if(b)selectAt(b.dataset.at)});$('#tbest-chart').addEventListener('keydown',e=>{const b=e.target.closest('[data-at]');if(b&&(e.key==='Enter'||e.key===' ')){e.preventDefault();selectAt(b.dataset.at)}});
 $('#theme').addEventListener('click',()=>{const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;cache.set('theme',theme);try{localStorage.setItem('cann-monitor:theme',theme)}catch{}});
 $('#export').addEventListener('click',()=>{
- if(!report?.events.length){$('#toast').textContent='没有可导出的变更';$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2500);return}
- const rows=[['首次采集时间(北京时间)','测试点','变化类型','变化前(μs)','变化后(μs)','变化百分比','匹配队伍','官方 TBest 提交ID','证据来源'],...[...report.events].reverse().map(e=>[date(e.at),e.index+1,directionName[e.direction],e.before,e.after,e.changePct,e.owner.teams.map(t=>t.name).join(' / '),e.owner.id,e.current.evidence])];
+ const visible=selectedCaseIndices($('#event-table').closest('.record-panel'),data?.tbest.length??0),events=report?.events.filter(e=>visible.includes(e.index))??[];
+ if(!events.length){$('#toast').textContent='没有可导出的变更';$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),2500);return}
+ const rows=[['首次采集时间(北京时间)','测试点','变化类型','变化前(μs)','变化后(μs)','变化百分比','匹配队伍','官方 TBest 提交ID','证据来源'],...[...events].reverse().map(e=>[date(e.at),e.index+1,directionName[e.direction],e.before,e.after,e.changePct,e.owner.teams.map(t=>t.name).join(' / '),e.owner.id,e.current.evidence])];
  const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"',blob=new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='cann-tbest-changes.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
+document.addEventListener('case-display-change',e=>{if(e.target.matches('.reference-chart-card')){$('#chart-case').value='all';hidden=new Set();renderChart()}if(e.target.contains($('#event-table'))){page=1;renderEvents()}});
 initTeamPrefixes({getData:()=>data,onChange:render});
 installIcons();client=await liveData();data=client.cached;render();await refresh();setInterval(()=>{if(!document.hidden)refresh()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});

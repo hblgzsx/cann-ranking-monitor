@@ -1,3 +1,4 @@
+import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
 import {liveData} from './lib/live-data.mjs?v=20261124-cases';
 import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
@@ -65,7 +66,7 @@ function renderList(){
  $('#record-updates').textContent=frozen?`列表已冻结${pending?` · 后台新增 ${pending} 条，恢复后显示`:''}`:newKeys.size?`本轮新增 ${newKeys.size} 条记录 · 自动更新中`:'云端采集继续 · 列表自动更新';
  $('#record-updates').classList.toggle('freeze-note',frozen);
 }
-function render(){if(!data)return;data=prefixData(data);records=submissionRecords({...data,teams:scopedTeams()});newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
+function render(){setCaseCatalog(data?.testcaseIds);if(!data)return;data=prefixData(data);records=submissionRecords({...data,teams:scopedTeams()});newKeys=new Set(lastKnownKeys.size?records.filter(r=>!lastKnownKeys.has(r.key)).map(r=>r.key):[]);lastKnownKeys=new Set(records.map(r=>r.key));updateTeamOptions();renderStats();if(!frozen){shownData=data;shown=records}renderList();freshness();if(detailKey&&$('#record-dialog').open)renderDetail(detailKey)}
 function renderDetail(key){
  const r=shown.find(r=>r.key===key);if(!r)return;detailKey=key;
  $('#record-detail-title').textContent=r.teamName;
