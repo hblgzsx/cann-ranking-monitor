@@ -1,12 +1,12 @@
 import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
-import {liveData} from './lib/live-data.mjs?v=20261126-backfill';
+import {liveData} from './lib/live-data.mjs?v=20261126-owner';
 import {referenceNotice,incompleteStatus} from './lib/case-evolution.mjs?v=20261124-cases';
 import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
-import {pointScore,validTime,resolveTbestOwners} from './lib/scoring.mjs?v=20261124-metadata';
+import {pointScore,validTime,resolveTbestOwners} from './lib/scoring.mjs?v=20261126-owner';
 import {initAnalysis} from './lib/analysis-ui.mjs?v=20261124-audit';
-import {rankTeams,rankingExport,compareRankingRows,reachesReference} from './lib/analytics.mjs?v=20261124-audit';
+import {rankTeams,rankingExport,compareRankingRows,reachesReference} from './lib/analytics.mjs?v=20261126-owner';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};
 let data=null,view='history',paused=false,busy=false,query='',onlyFavorites=false,sortKey='score',ascending=false,selectedTeam=null,selectedChartAt=null,toastTimer;
@@ -22,7 +22,7 @@ function toast(s){clearTimeout(toastTimer);$('#toast').textContent=s;$('#toast')
 function statusClass(status){const s=String(status).trim().toLowerCase();if(incompleteStatus(s))return 'pending';if(s==='pass')return 'pass';if(s==='wrong answer')return 'wrong-answer';if(s==='runtime error')return 'runtime-error';if(s==='compile error')return 'compile-error';if(s==='time limit exceeded'||s==='timeout')return 'time-limit';if(s==='memory limit exceeded')return 'memory-limit';if(s==='output limit exceeded')return 'output-limit';if(/^(pending|queued|running|judging|compiling|waiting|unjudged)$/.test(s))return 'pending';if(/error|fail/.test(s))return 'system-error';return 'unknown'}
 function ranked(mode='history'){return data?rankTeams(data,mode):[]}
 function ownerLabels(){const names=new Map(data.teams.map(t=>[t.id,t.name]));return resolveTbestOwners(data).map(o=>({...o,names:o.teamIds.map(id=>names.get(id)),label:o.teamIds.length?o.teamIds.map(id=>names.get(id)).join('、'):'未采集到归属'}))}
-function ownerCell(owner){return `<span title="${esc(owner.label)}">${esc(owner.label)}</span>${owner.method==='observed-match'?'<small class="owner-method">历史耗时匹配</small>':owner.method==='official-submission'?'<small class="owner-method">官方提交标识</small>':''}`}
+function ownerCell(owner){return `<span title="${esc(owner.label)}">${esc(owner.label)}</span>${owner.method==='observed-match'?'<small class="owner-method">历史耗时匹配</small>':owner.method==='observed-display-match'?'<small class="owner-method">手工补录耗时匹配 · 归属未核实</small>':owner.method==='official-submission'?'<small class="owner-method">官方提交标识</small>':''}`}
 function rankChange(id){const change=data.changes,delta=change?.ranks?.[id]?.[view];if(delta===undefined||delta===0)return '';return `<small class="rank-change ${delta===null||delta>0?'green':'loss'}" title="${esc(date(change.at))} 相比 ${esc(date(change.since))} 的名次变化">${delta===null?'新':delta>0?'↑'+delta:'↓'+Math.abs(delta)}</small>`}
 function filtered(){
  let teams=ranked(view).map(t=>({...t,displayRank:t.rank}));
@@ -69,7 +69,7 @@ function render(){setCaseCatalog(data?.testcaseIds);
  $('#stat-teams').textContent=r.length;$('#stat-pass').textContent=`${r.filter(t=>/^pass$/i.test(t.status)).length} 支队伍当前通过`;
  $('#stat-best').textContent=fmt(r[0]?.computed);$('#stat-leader').textContent=r[0]?.name??'等待数据';$('#stat-points').textContent=data.tbest.length;
  $('#stat-snapshots').textContent=data.snapshotCount??Math.max(0,...r.map(t=>t.observations??0));$('#stat-start').textContent=`始于 ${date(data.startedAt)}`;$('#history-count').textContent=r.length;
- $('#reference').innerHTML=data.tbest.map((t,i)=>`<div class="reference-item"><small>测试点 ${String(i+1).padStart(2,'0')}</small><strong>${time(t)}</strong>${data.tbestStatus?.[i]==='retained'?`<small title="最后确认 ${date(data.tbestLastValidAt?.[i])}">保留参考 · 暂估</small>`:!validTime(t)?'<small>等待官方 TBest</small>':''}<span class="reference-owner" title="${esc(owners[i].label)}">${esc(owners[i].label)}</span></div>`).join('');
+ $('#reference').innerHTML=data.tbest.map((t,i)=>`<div class="reference-item"><small>测试点 ${String(i+1).padStart(2,'0')}</small><strong>${time(t)}</strong>${data.tbestStatus?.[i]==='retained'?`<small title="最后确认 ${date(data.tbestLastValidAt?.[i])}">保留参考 · 暂估</small>`:!validTime(t)?'<small>等待官方 TBest</small>':''}<span class="reference-owner" title="${esc(owners[i].label)}">${esc(owners[i].label)}</span>${owners[i].method==='observed-display-match'?'<small>手工补录耗时匹配 · 归属未核实</small>':''}</div>`).join('');
  freshness();renderTable();analysis.renderChanges();if(selectedTeam&&$('#team-dialog').open)renderDetail(selectedTeam);
 }
 async function refresh(manual=false){

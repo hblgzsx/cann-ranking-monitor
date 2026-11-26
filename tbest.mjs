@@ -1,7 +1,7 @@
 import {setCaseCatalog,selectedCaseIndices} from './lib/case-display.mjs?v=20261125-case-display';
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
-import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261124-cases';
-import {liveData,cache} from './lib/live-data.mjs?v=20261126-backfill';
+import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261126-owner';
+import {liveData,cache} from './lib/live-data.mjs?v=20261126-owner';
 import {installIcons} from './lib/icons.mjs';
 import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -10,7 +10,7 @@ const date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',
 const colors=['#3b82f6','#10b981','#f59e0b','#a78bfa','#f472b6','#06b6d4','#e57373','#84b43e','#cb8c38','#7186dd'];
 const directionName={faster:'参考变快',slower:'参考回退',owner:'归属变更'};
 let data=null,report=null,client=null,busy=false,selectedAt=null,selectedEventKey=null,page=1,hidden=new Set(),teamSignature='',impactTeamId='',toastTimer;
-function ownerHtml(owner){return `<span>${owner.teams.length?owner.teams.map(t=>`<a href="./team.html?team=${encodeURIComponent(t.id)}">${esc(t.name)}</a>`).join(' / '):'未采集到归属'}</span>${owner.method==='observed-match'?'<small>历史耗时匹配 · 归属未核实</small>':owner.method==='official-id'?'<small>官方提交 ID 已核对</small>':''}${owner.id?`<small title="官方 TBest 提交 ID">${esc(owner.id)}</small>`:'<small>未保存官方提交 ID</small>'}`}
+function ownerHtml(owner){return `<span>${owner.teams.length?owner.teams.map(t=>`<a href="./team.html?team=${encodeURIComponent(t.id)}">${esc(t.name)}</a>`).join(' / '):'未采集到归属'}</span>${owner.method==='observed-match'?'<small>历史耗时匹配 · 归属未核实</small>':owner.method==='observed-display-match'?'<small>手工补录耗时匹配 · 归属未核实</small>':owner.method==='official-id'?'<small>官方提交 ID 已核对</small>':''}${owner.id?`<small title="官方 TBest 提交 ID">${esc(owner.id)}</small>`:'<small>未保存官方提交 ID</small>'}`}
 function getFrom(){return $('#range').value==='all'?null:Date.now()-Number($('#range').value)*3600000}
 function updateReport(){report=tbestReport(data,{from:getFrom(),caseIndex:$('#event-case').value==='all'?null:Number($('#event-case').value),direction:$('#event-direction').value})}
 function renderMetrics(){

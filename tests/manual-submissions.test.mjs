@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {applyManualSubmissions,manualSubmissions,manualSubmissionNote} from '../lib/manual-submissions.mjs';
-import {mergeSnapshot,bestHistoricalSubmission,observedSubmissions} from '../lib/scoring.mjs';
+import {mergeSnapshot,bestHistoricalSubmission,observedSubmissions,resolveTbestOwners,referenceTimeMatch} from '../lib/scoring.mjs';
+import {tbestReport} from '../lib/tbest-analysis.mjs';
 import {submissionRecords,dayStatistics} from '../lib/submissions.mjs';
 import {buildTeamReport} from '../lib/team-report.mjs';
 import {liveData} from '../lib/live-data.mjs';
@@ -34,4 +35,22 @@ test('navigation immediately includes backfill in a recently synchronized cached
  const client=await liveData({store:{load:async()=>({snapshot,checkedAt:Date.parse(snapshot.capturedAt)}),save:async()=>true},now:()=>Date.parse(snapshot.capturedAt)+1000,fetcher:async()=>{calls++;throw Error('unexpected network')}});
  assert.equal(submissionRecords(client.cached).filter(r=>r.submissionId===entry.submissionId).length,1);
  assert.equal(submissionRecords(await client.read()).filter(r=>r.submissionId===entry.submissionId).length,1);assert.equal(calls,0);
+});
+
+test('rounded manual case5 matches 49.241 only as unverified display evidence, without relaxing raw comparisons',()=>{
+ const data=applyManualSubmissions(base());data.tbest[4]=49.241;data.tbestSubmissionIds=Array(13).fill('');data.tbestHistory.at(-1).tbest[4]=49.241;
+ const original=structuredClone(data),owner=resolveTbestOwners(data)[4],report=tbestReport(data);
+ assert.deepEqual(owner,{teamIds:[entry.teamId],method:'observed-display-match'});assert.equal(report.cases[4].owners.method,'observed-display-match');assert.equal(report.cases[4].owners.teams[0].name,'Lizzop');assert.deepEqual(data,original);
+ const manual=data.teams[0].submissions.find(s=>s.source==='manual-user');
+ assert.equal(referenceTimeMatch(manual,4,49.241,entry.testcaseIds[4]),'display');assert.equal(referenceTimeMatch({...manual,source:'official-collector'},4,49.241,entry.testcaseIds[4]),null);
+ assert.equal(referenceTimeMatch(manual,4,49.246,entry.testcaseIds[4]),null);assert.equal(referenceTimeMatch(manual,4,49.245,entry.testcaseIds[4]),null);
+ data.tbestSubmissionIds[4]=entry.submissionId;assert.equal(resolveTbestOwners(data)[4].method,'official-submission');
+ data.tbest[4]=49.23;assert.equal(resolveTbestOwners(data)[4].method,'unknown');
+});
+
+test('backed-up manual records acquire case identity precision once; later raw observations replace manual provenance',()=>{
+ const data=applyManualSubmissions(base()),manual=data.teams[0].submissions.find(s=>s.source==='manual-user');delete manual.displayPrecisionUs;
+ const next=applyManualSubmissions(data);assert.equal(next.teams[0].submissions.find(s=>s.source==='manual-user').displayPrecisionUs[entry.testcaseIds[4]],.01);assert.strictEqual(applyManualSubmissions(next),next);
+ const team=next.teams[0];team.history.push({submissionId:entry.submissionId,latest:entry.times.map(t=>t+.001),status:'Pass',at:next.capturedAt});
+ const raw=observedSubmissions(team,13).find(s=>s.submissionId===entry.submissionId);assert.equal(raw.source,'official-collector');assert.equal(raw.timingPrecision,'raw-api');assert.equal(raw.displayPrecisionUs,undefined);assert.equal(raw.times[4],49.241);
 });
