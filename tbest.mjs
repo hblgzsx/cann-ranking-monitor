@@ -1,7 +1,7 @@
 import {setCaseCatalog,selectedCaseIndices} from './lib/case-display.mjs?v=20261125-case-display';
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261124-cases';
-import {liveData,cache} from './lib/live-data.mjs?v=20261124-cases';
+import {liveData,cache} from './lib/live-data.mjs?v=20261126-backfill';
 import {installIcons} from './lib/icons.mjs';
 import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

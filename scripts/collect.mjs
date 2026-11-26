@@ -2,13 +2,14 @@ import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fetchRanking} from '../lib/source.mjs';
 import {mergeSnapshot} from '../lib/scoring.mjs';
+import {applyManualSubmissions} from '../lib/manual-submissions.mjs';
 import {snapshotChanges,hasChanges} from '../lib/analytics.mjs';
 import {intervalSeconds} from '../lib/polling.mjs';
 const output=resolve(process.env.OUTPUT_FILE??'data/latest.json');
 let previous=null;
 try{previous=JSON.parse(await readFile(output,'utf8'))}catch(e){if(e.code!=='ENOENT')throw Error('Previous history is corrupt; refusing to reset: '+e.message)}
 const snapshot=await fetchRanking();
-const merged=mergeSnapshot(previous,snapshot);
+const merged=applyManualSubmissions(mergeSnapshot(previous,snapshot));
 merged.expectedIntervalSeconds=intervalSeconds(process.env.POLL_INTERVAL_SECONDS);
 const changes=snapshotChanges(previous,merged);
 merged.changes=changes===null?null:hasChanges(changes)?changes:previous?.changes??changes;
