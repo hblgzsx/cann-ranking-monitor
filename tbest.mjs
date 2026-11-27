@@ -1,5 +1,5 @@
 import {setCaseCatalog,selectedCaseIndices} from './lib/case-display.mjs?v=20261125-case-display';
-import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261127-insights';
 import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261127-validity';
 import {liveData,cache} from './lib/live-data.mjs?v=20261127-validity';
 import {installIcons} from './lib/icons.mjs';

@@ -1,11 +1,11 @@
 import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
 import {liveData} from './lib/live-data.mjs?v=20261127-validity';
 import {referenceNotice,incompleteStatus} from './lib/case-evolution.mjs?v=20261127-validity';
-import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
+import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261127-insights';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,validTime,resolveTbestOwners} from './lib/scoring.mjs?v=20261127-validity';
-import {initAnalysis} from './lib/analysis-ui.mjs?v=20261127-validity';
+import {initAnalysis} from './lib/analysis-ui.mjs?v=20261127-insights';
 import {rankTeams,rankingExport,compareRankingRows,referenceRelation} from './lib/analytics.mjs?v=20261127-validity';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage={get(k,f){try{return JSON.parse(localStorage.getItem('cann-monitor:'+k))??f}catch{return f}},set(k,v){try{localStorage.setItem('cann-monitor:'+k,JSON.stringify(v))}catch{}}};

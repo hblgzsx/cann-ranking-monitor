@@ -1,6 +1,6 @@
 import {invalidatedResultNote} from './lib/result-validity.mjs?v=20261127-validity';
 import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
-import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
+import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261127-insights';
 import {initSubmissionAnalysis} from './lib/team-analysis-ui.mjs?v=20261127-validity';
 import {installIcons} from './lib/icons.mjs';
 import {buildTeamReport} from './lib/team-report.mjs?v=20261127-validity';

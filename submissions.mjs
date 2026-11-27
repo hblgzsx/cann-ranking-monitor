@@ -3,7 +3,7 @@ import {manualSubmissionNote} from './lib/manual-submissions.mjs?v=20261126-owne
 import {setCaseCatalog} from './lib/case-display.mjs?v=20261125-case-display';
 import {liveData} from './lib/live-data.mjs?v=20261127-validity';
 import {referenceNotice} from './lib/case-evolution.mjs?v=20261127-validity';
-import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261122-regions';
+import {prefixData,initTeamPrefixes,teamInSelectedRegion} from './lib/team-prefix-ui.mjs?v=20261127-insights';
 import {installIcons} from './lib/icons.mjs';
 installIcons();
 import {pointScore,totalScore,validTime} from './lib/scoring.mjs?v=20261124-cases';
