@@ -30,7 +30,13 @@ function toast(text){$('#toast').textContent=text;$('#toast').classList.add('sho
 function metric(cards){return `<div class="insight-metrics">${cards.map(([label,value,note])=>`<article><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(note??'')}</small></article>`).join('')}</div>`}
 function head(title,note='',actions=''){return `<div class="insight-head"><div><h2>${title}</h2>${note?`<p>${note}</p>`:''}</div>${actions}</div>`}
 function context(extra=''){return `<p class="insight-copy">快照 ${date(data.capturedAt)} · ${esc(state.range==='all'?'全部已保存历史':state.day+(state.range==='week'?'所在周':''))} · ${esc(extra||basisLabel())}${$('#region-filter')?.value?' · '+esc($('#region-filter').selectedOptions[0]?.textContent):''}</p>`}
-function table(headers,rows,{classes='',empty='所选范围暂无记录。'}={}){return `<div class="table-scroll"><table class="insight-table ${classes}"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${headers.length}" class="insight-empty">${empty}</td></tr>`}</tbody></table></div>`}
+function table(headers,rows,{classes='',empty='所选范围暂无记录。'}={}){
+ const numericLabels=new Set(['名次','总分','匹配当前 TBest','分数变化','按耗时','耗时','重算分','与当前 TBest 差距','t / T','官方当前 TBest','顺序','有效队数','队均分','前三均分','全国前十','区内','全国','分数','历史峰值','当前分数','当前回落','最大历史回落','观测排序','变化','观测领先时长','区间次数','区间起点分数','有记录的队伍','参考账本点数']);
+ const body=document.createElement('tbody');body.innerHTML=rows.join('');
+ const numeric=headers.map((label,index)=>numericLabels.has(label)||label.endsWith('改善')||[...body.rows].some(row=>row.cells.length===headers.length&&row.cells[index]?.classList.contains('numeric')));
+ for(const row of body.rows){if(row.cells.length!==headers.length)continue;for(let i=0;i<headers.length;i++)if(numeric[i])row.cells[i].classList.add('numeric')}
+ return `<div class="table-scroll"><table class="insight-table ${classes}"><thead><tr>${headers.map((h,i)=>`<th scope="col"${numeric[i]?' class="numeric"':''}>${h}</th>`).join('')}</tr></thead><tbody>${body.innerHTML||`<tr><td colspan="${headers.length}" class="insight-empty">${empty}</td></tr>`}</tbody></table></div>`;
+}
 function paginate(total,page,action,size=40){const pages=Math.max(1,Math.ceil(total/size));return `<div class="insight-pagination"><span>第 ${page} / ${pages} 页 · ${total} 条</span><div><button class="button" data-page="${action}" data-offset="-1" ${page<=1?'disabled':''}>上一页</button><button class="button" data-page="${action}" data-offset="1" ${page>=pages?'disabled':''}>下一页</button></div></div>`}
 function ownerDescription(owner){return owner.method==='official-submission'?'官方提交 ID 核对':owner.method==='observed-match'?'原始耗时精确匹配 · 归属未核实':owner.method==='observed-display-match'?'手工补录显示精度匹配 · 归属未核实':'官方未公开 / 未采集到归属'}
 function ownerLinks(owner){return owner.teamIds.map(id=>teamLink(id,data.teams.find(t=>t.id===id)?.name??id)).join('、')||'<span class="muted">未确认</span>'}
