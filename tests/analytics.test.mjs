@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snapshotChanges,hasChanges,estimateScenario,submissionsFor,rankTeams,rankingExport,compareRankingRows,reachesReference} from '../lib/analytics.mjs';
+import {snapshotChanges,hasChanges,estimateScenario,submissionsFor,rankTeams,rankingExport,compareRankingRows,reachesReference,referenceRelation} from '../lib/analytics.mjs';
 const sample=()=>({testcaseIds:['a','b'],tbest:[10,10],capturedAt:'2026-11-21T12:00:00Z',teams:[{id:'a',name:'A',historical:[10,20],latest:[10,20],officialRank:1,submissions:[{submissionId:'a1',times:[10,20]}]},{id:'b',name:'B',historical:[20,20],latest:[20,20],officialRank:2,submissions:[{submissionId:'b1',times:[20,20]}]}]});
 test('scenario recomputes rank without changing real data or TBest',()=>{const d=sample(),original=JSON.stringify(d),s=estimateScenario(d,'b','history',[10,10]);assert.equal(s.after,100);assert.equal(s.beforeRank,2);assert.equal(s.rank,1);assert.ok(s.delta>0);assert.equal(JSON.stringify(d),original);assert.equal(estimateScenario(d,'b','history',[1,1]).after,100)});
 test('scenario counts missing points as zero and rejects invalid times',()=>{const d=sample();assert.equal(estimateScenario(d,'a','official',[10,null]).after,50);for(const v of [0,-1,NaN,Infinity,'10'])assert.throws(()=>estimateScenario(d,'a','history',[v,10]));assert.throws(()=>estimateScenario(d,'absent','single',[10,10]));assert.throws(()=>estimateScenario(d,'a','single',[10]))});
@@ -32,4 +32,12 @@ test('missing performance and reference values cannot become TBest or sort befor
 test('official-view optimization reports a recomputed baseline rank, not the official position',()=>{
  const d=sample();d.teams[0].latest=[30,30];d.teams[1].latest=[10,10];
  assert.equal(rankTeams(d,'official')[0].id,'a');assert.equal(estimateScenario(d,'a','official',[10,10]).beforeRank,2);
+});
+
+test('historical faster case3 is not a second current TBest and capped scores remain unchanged',()=>{
+ const d={testcaseIds:['case3'],tbest:[1.9835],teams:[{id:'old',name:'你说的队',officialRank:2,historical:[.5866666666666667],latest:[null]},{id:'current',name:'v4.1-fLaSh',officialRank:1,historical:[1.9835],latest:[1.9835]}]};
+ const old=rankTeams(d,'history').find(t=>t.id==='old'),current=rankTeams(d,'history').find(t=>t.id==='current');
+ assert.equal(old.bestCount,0);assert.equal(old.historicalFasterCount,1);assert.equal(old.analysisScore,100);assert.equal(current.bestCount,1);assert.equal(current.historicalFasterCount,0);
+ assert.equal(referenceRelation(.5866666666666667,1.9835),'historical-faster');assert.equal(referenceRelation(1.9835,1.9835),'matched');assert.equal(referenceRelation(1.98350001,1.9835),'slower');assert.equal(referenceRelation(null,1.9835),'missing');assert.equal(referenceRelation(1,null),'missing');
+ const exported=rankingExport(d,'history'),row=exported.rows.find(r=>r[1]==='你说的队');assert.equal(row[exported.headers.indexOf('TBest点数')],0);
 });

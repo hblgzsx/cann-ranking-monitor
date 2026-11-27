@@ -1,9 +1,9 @@
 import {setCaseCatalog,selectedCaseIndices} from './lib/case-display.mjs?v=20261125-case-display';
 import {prefixData,initTeamPrefixes} from './lib/team-prefix-ui.mjs?v=20261122-regions';
-import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261126-owner';
-import {liveData,cache} from './lib/live-data.mjs?v=20261126-owner';
+import {tbestReport,referenceImpact,tbestChangeText} from './lib/tbest-analysis.mjs?v=20261127-validity';
+import {liveData,cache} from './lib/live-data.mjs?v=20261127-validity';
 import {installIcons} from './lib/icons.mjs';
-import {referenceNotice} from './lib/case-evolution.mjs?v=20261124-cases';
+import {referenceNotice} from './lib/case-evolution.mjs?v=20261127-validity';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const valid=n=>Number.isFinite(n)&&n>0,fmt=n=>Number.isFinite(n)?n.toFixed(2):'—',pct=n=>Number.isFinite(n)?(n>0?'+':'')+fmt(n)+'%':'—',time=n=>!valid(n)?'未公开 / 待参考':n>=1000?fmt(n/1000)+' ms':fmt(n)+' μs';
 const date=t=>t&&Number.isFinite(Date.parse(t))?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t)):'—';

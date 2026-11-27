@@ -29,7 +29,7 @@ jobs:
           cp lib/snapshot-store.mjs _site/lib/
           cp lib/case-evolution.mjs _site/lib/
           cp share-images.css case-display.css _site/
-          cp lib/share-images.mjs lib/case-display.mjs lib/manual-submissions.mjs _site/lib/
+          cp lib/share-images.mjs lib/case-display.mjs lib/manual-submissions.mjs lib/result-validity.mjs _site/lib/
           mkdir -p _site/lib/vendor
           cp lib/vendor/html-to-image.mjs lib/vendor/html-to-image.LICENSE _site/lib/vendor/
           touch _site/.nojekyll

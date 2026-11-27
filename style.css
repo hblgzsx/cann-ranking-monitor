@@ -22,3 +22,5 @@
 .ranking-submission{min-width:215px;max-width:290px;text-align:left}
 .coverage-note{display:block;color:var(--muted);font-size:10px;margin-top:5px;white-space:nowrap}
 .chart-readout{grid-template-columns:minmax(0,1.4fr) minmax(110px,1fr)}
+
+.reference-faster{color:var(--orange)}.time-cell.reference-faster{background:color-mix(in srgb,var(--orange) 8%,var(--surface))}.time-cell.reference-faster>small:not(.point-score){color:var(--orange);font-size:9px;white-space:normal}
